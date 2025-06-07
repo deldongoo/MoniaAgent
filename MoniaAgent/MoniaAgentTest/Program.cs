@@ -15,6 +15,10 @@ var timeAgent = new TimeAgent(llm);
 await timeAgent.ConnectAsync();
 orchestrator.RegisterAgent(timeAgent);
 
+var desktopAgent = new DesktopCommanderAgent(llm);
+await desktopAgent.ConnectAsync();
+orchestrator.RegisterAgent(desktopAgent);
+
 var generalAgent = new Agent(llm, new List<Tool>(), "You are a helpful AI assistant");
 await generalAgent.ConnectAsync();
 orchestrator.RegisterAgent(generalAgent);
@@ -24,6 +28,9 @@ Console.WriteLine("=== Testing Agent Orchestration ===");
 
 var timeResponse = await orchestrator.Execute("What time is it right now?");
 Console.WriteLine($"Time query → {timeResponse}");
+
+var desktopResponse = await orchestrator.Execute("Can you take a screenshot of my desktop?");
+Console.WriteLine($"Desktop query → {desktopResponse}");
 
 var generalResponse = await orchestrator.Execute("Hello, how are you?");
 Console.WriteLine($"General query → {generalResponse}");
