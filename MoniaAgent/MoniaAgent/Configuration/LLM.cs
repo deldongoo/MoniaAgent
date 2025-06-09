@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MoniaAgent
+namespace MoniaAgent.Configuration
 {
     public class LLM
     {

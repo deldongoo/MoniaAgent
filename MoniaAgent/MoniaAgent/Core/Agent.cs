@@ -9,8 +9,10 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Text.Json;
 using ModelContextProtocol.Client;
+using MoniaAgent.Configuration;
+using MoniaAgent.Tools;
 
-namespace MoniaAgent
+namespace MoniaAgent.Core
 {
 
     public class LoggingHandler : DelegatingHandler

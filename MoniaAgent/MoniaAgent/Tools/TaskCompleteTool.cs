@@ -1,9 +1,9 @@
 using Microsoft.Extensions.AI;
 using System.Collections.Generic;
 
-namespace MoniaAgent
+namespace MoniaAgent.Tools
 {
-    public static class TaskCompleteTool
+    internal static class TaskCompleteTool
     {
         public static AITool Create()
         {

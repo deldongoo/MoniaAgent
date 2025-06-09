@@ -1,6 +1,6 @@
 using System;
 
-namespace MoniaAgent
+namespace MoniaAgent.Configuration
 {
     public class AgentConfig
     {

@@ -1,4 +1,5 @@
-using MoniaAgent;
+using MoniaAgent.Agents;
+using MoniaAgent.Configuration;
 using System.ComponentModel;
 
 namespace MoniaAgentTest

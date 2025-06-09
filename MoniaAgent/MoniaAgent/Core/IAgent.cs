@@ -1,6 +1,6 @@
-namespace MoniaAgent
+namespace MoniaAgent.Core
 {
-    public interface IAgent
+    internal interface IAgent
     {
         string Name { get; }
         string Specialty { get; }

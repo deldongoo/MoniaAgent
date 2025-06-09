@@ -1,6 +1,11 @@
 using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using MoniaAgent.Agents;
 
-namespace MoniaAgent
+namespace MoniaAgent.Core
 {
     public class AgentOrchestrator
     {
@@ -10,7 +15,7 @@ namespace MoniaAgent
 
         private readonly List<IAgent> agents = new List<IAgent>();
 
-        public void RegisterAgent(IAgent agent)
+        public void RegisterAgent<T>(T agent) where T : SpecializedAgent
         {
             agents.Add(agent);
             logger.LogInformation("Registered agent: {AgentName} - {Specialty}", agent.Name, agent.Specialty);
@@ -36,9 +41,9 @@ namespace MoniaAgent
             return specializedAgents.FirstOrDefault() ?? capableAgents.First();
         }
 
-        public IReadOnlyList<IAgent> GetRegisteredAgents()
+       /* public IReadOnlyList<string> GetRegisteredAgentNames()
         {
-            return agents.AsReadOnly();
-        }
+            return agents.Select(a => $"{a.Name} - {a.Specialty}").ToList().AsReadOnly();
+        }*/
     }
 }

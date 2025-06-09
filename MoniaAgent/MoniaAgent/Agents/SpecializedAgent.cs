@@ -3,8 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using MoniaAgent.Core;
+using MoniaAgent.Configuration;
+using MoniaAgent.Tools;
 
-namespace MoniaAgent
+namespace MoniaAgent.Agents
 {
     public abstract class SpecializedAgent : Agent
     {

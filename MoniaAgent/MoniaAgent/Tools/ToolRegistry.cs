@@ -4,10 +4,11 @@ using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using System.Collections.Generic;
 using System.Text.Json;
+using MoniaAgent.Configuration;
 
-namespace MoniaAgent
+namespace MoniaAgent.Tools
 {
-    public class ToolRegistry
+    internal class ToolRegistry
     {
         private static readonly ILoggerFactory loggerFactory = LoggerFactory.Create(builder => 
         builder.AddConsole().SetMinimumLevel(LogLevel.Information));

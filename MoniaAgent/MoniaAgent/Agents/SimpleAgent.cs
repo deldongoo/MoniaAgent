@@ -1,6 +1,7 @@
 using System;
+using MoniaAgent.Configuration;
 
-namespace MoniaAgent
+namespace MoniaAgent.Agents
 {
     public class SimpleAgent : SpecializedAgent
     {
