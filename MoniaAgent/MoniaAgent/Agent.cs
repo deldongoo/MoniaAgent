@@ -146,6 +146,16 @@ namespace MoniaAgent
                         // Add all response messages
                         messages.AddRange(completion.Messages);
                         
+                        // Log any text content that accompanies tool calls
+                        foreach (var message in completion.Messages)
+                        {
+                            var textContent = message.Contents.OfType<TextContent>().FirstOrDefault()?.Text;
+                            if (!string.IsNullOrEmpty(textContent))
+                            {
+                                Console.WriteLine($"[RESPONSE] {textContent}");
+                            }
+                        }
+                        
                         // Get tool calls from the response
                         var toolCalls = completion.Messages
                             .SelectMany(m => m.Contents.OfType<FunctionCallContent>())
@@ -170,7 +180,7 @@ namespace MoniaAgent
                             // If task_complete was called, return its result immediately
                             if (toolCall.Name == "task_complete")
                             {
-                                return toolResult;
+                                return "Exit";
                             }
                             
                             // Add tool result as message
@@ -185,6 +195,13 @@ namespace MoniaAgent
                         // Pure text response
                         var lastMessage = completion.Messages.LastOrDefault();
                         lastTextResponse = lastMessage?.Text ?? "";
+                        
+                        // Log text responses
+                        if (!string.IsNullOrEmpty(lastTextResponse))
+                        {
+                            Console.WriteLine($"[RESPONSE] {lastTextResponse}");
+                        }
+                        
                         if (lastMessage != null)
                             messages.Add(lastMessage);
                         consecutiveNonToolMessages++;

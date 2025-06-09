@@ -11,7 +11,7 @@ var llm = new LLM
 /*var mcpTimeAgent = new McpTimeAgent(llm);
 await mcpTimeAgent.ConnectAsync();
 var timeResult = await mcpTimeAgent.Execute("Quelle heure est il?.");
-Console.WriteLine($"McpTimeAgent result: {timeResult}");*/
+Console.WriteLine($"{timeResult}");*/
 
 var fileSystemAgent = new FileSystemAgent(llm);
 await fileSystemAgent.ConnectAsync();
@@ -20,8 +20,8 @@ var fileSystemResponse = await fileSystemAgent.Execute("Crée un fichier txt ave
     "remplace 'coucou' par 'Hello World' dans le nouveau fichier. A la fin il doit y avoir 2 fichiers, 1 avec 'coucou', l'autre avec 'Hello World'");
 Console.WriteLine($"McpFileSystemAgent result: {fileSystemResponse}");
 
-/*// Create orchestrator and register agents
-var orchestrator = new AgentOrchestrator();
+// Create orchestrator and register agents
+/*var orchestrator = new AgentOrchestrator();
 
 var timeAgent = new TimeAgent(llm);
 await timeAgent.ConnectAsync();
@@ -45,8 +45,8 @@ var desktopResponse = await orchestrator.Execute("Can you take a screenshot of m
 Console.WriteLine($"Desktop query → {desktopResponse}");
 
 var generalResponse = await orchestrator.Execute("Hello, how are you?");
-Console.WriteLine($"General query → {generalResponse}");
+Console.WriteLine($"General query → {generalResponse}");*/
 
 // Test the conversational loop
-Console.WriteLine("\n=== Testing Conversational Loop Directly ===");
+/*Console.WriteLine("\n=== Testing Conversational Loop Directly ===");
 await ConversationalTest.TestConversationalLoop();*/

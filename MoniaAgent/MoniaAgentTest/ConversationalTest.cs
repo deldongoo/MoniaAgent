@@ -24,17 +24,17 @@ namespace MoniaAgentTest
             
             // Test 1: Simple task
             Console.WriteLine("\n--- Test 1: Simple greeting ---");
-            var result1 = await agent.Execute("Say hello and then call task_complete");
+            var result1 = await agent.Execute("Say hello");
             Console.WriteLine($"Result: {result1}");
 
             // Test 2: Multi-step task
             Console.WriteLine("\n--- Test 2: Multi-step calculation ---");
-            var result2 = await agent.Execute("Calculate 25 * 8, then add 17 to the result, then call task_complete");
+            var result2 = await agent.Execute("Calculate 25 * 8, then add 17 to the result");
             Console.WriteLine($"Result: {result2}");
 
             // Test 3: Complex reasoning task
             Console.WriteLine("\n--- Test 3: Complex task ---");
-            var result3 = await agent.Execute("Tell me 3 facts about France, then explain why Paris is the capital, then call task_complete");
+            var result3 = await agent.Execute("Tell me 3 facts about France, then explain why Paris is the capital");
             Console.WriteLine($"Result: {result3}");
 
             // Test 4: Task without explicit completion request
