@@ -1,33 +1,28 @@
-using Microsoft.Extensions.AI;
 using MoniaAgent;
+using System.ComponentModel;
 
 namespace MoniaAgentTest
 {
-    public class TimeAgent : Agent
+    public class TimeAgent : SpecializedAgent
     {
-        public override string Name => "TimeAgent";
-        public override string Specialty => "Time and scheduling queries";
-
-        public override bool CanHandle(string task)
+        public TimeAgent(LLM llm) : base(llm)
         {
-            var keywords = new[] { "time", "date", "when", "schedule", "timezone" };
-            return keywords.Any(k => task.ToLower().Contains(k));
         }
 
-        public TimeAgent(LLM llm) : base(llm, CreateTimeTools(), GetTimeGoal())
+        protected override AgentConfig Configure() => new()
         {
-        }
-        
-        private static IList<AITool> CreateTimeTools()
+            Name = "TimeAgent",
+            Specialty = "Time and scheduling queries",
+            Keywords = new[] { "time", "date", "when", "schedule", "timezone" },
+            ToolMethods = new Delegate[] { GetCurrentTime },
+            Goal = "You are a time specialist AI assistant. You help users with time-related queries, timezone conversions, and scheduling. Always use the get_current_time tool when users ask about current time."
+        };
+
+        [Description("Gets the current date and time. Parameters: timezone (optional: 'utc', 'local', or timezone ID), format (optional: .NET datetime format string)")]
+        private static string GetCurrentTime()
         {
-            var registry = new ToolRegistry();
-            registry.RegisterTool(CurrentTimeTool.Create());
-            return registry.GetAllTools();
-        }
-        
-        private static string GetTimeGoal()
-        {
-            return "You are a time specialist AI assistant. You help users with time-related queries, timezone conversions, and scheduling. Always use the get_current_time tool when users ask about current time.";
+            DateTime dateTime = DateTime.Now;
+            return dateTime.ToString("yyyy-MM-dd HH:mm:ss zzz");
         }
     }
 }

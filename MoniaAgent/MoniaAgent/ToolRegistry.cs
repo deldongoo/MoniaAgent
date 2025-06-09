@@ -10,9 +10,9 @@ namespace MoniaAgent
     public class ToolRegistry
     {
         private static readonly ILoggerFactory loggerFactory = LoggerFactory.Create(builder => 
-            builder.AddConsole().SetMinimumLevel(LogLevel.Information));
+        builder.AddConsole().SetMinimumLevel(LogLevel.Information));
         private static readonly ILogger logger = loggerFactory.CreateLogger<ToolRegistry>();
-        public readonly List<AITool> tools = new List<AITool>();
+        private readonly List<AITool> tools = new List<AITool>();
 
         public void RegisterTool(AITool tool)
         {
@@ -22,11 +22,15 @@ namespace MoniaAgent
 
         public async Task RegisterMcpServerAsync(McpServer server)
         {
-            server?.Validate();
-            
+            server?.Validate();            
             try
             {
-                logger.LogDebug("Connecting to MCP server '{ServerName}'", server!.Name);
+                IClientTransport clientTransport = server.GetTransport();
+                var mcpClient = await McpClientFactory.CreateAsync(clientTransport);
+                var mcpTools = await mcpClient.ListToolsAsync();
+                tools.AddRange(mcpTools);
+
+              /*  logger.LogDebug("Connecting to MCP server '{ServerName}'", server!.Name);
                 IClientTransport clientTransport = server.GetTransport();
                 var mcpClient = await McpClientFactory.CreateAsync(clientTransport);
                 
@@ -43,7 +47,7 @@ namespace MoniaAgent
                 logger.LogInformation("Successfully loaded {ToolCount} tools from MCP server '{ServerName}'", 
                     mcpTools.Count(), server.Name);
                 
-                logger.LogDebug("Total tools in registry after MCP server: {TotalCount}", tools.Count);
+                logger.LogDebug("Total tools in registry after MCP server: {TotalCount}", tools.Count);*/
             }
             catch (Exception ex)
             {

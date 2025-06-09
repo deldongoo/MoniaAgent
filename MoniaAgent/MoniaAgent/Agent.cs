@@ -53,18 +53,19 @@ namespace MoniaAgent
             builder.AddConsole().SetMinimumLevel(LogLevel.Information));
         private static readonly ILogger logger = loggerFactory.CreateLogger<Agent>();
         
-        private readonly LLM? llm;
-        private readonly IList<AITool> tools;
-        private readonly string goal;
+        protected readonly LLM? llm;
+        protected readonly IList<AITool> tools;
         private IChatClient? chatClient;
-        private IMcpClient? mcpClient;
+        protected IMcpClient? mcpClient;
+        
+        protected string Goal { get; private set; } = string.Empty;
 
         // IAgent implementation
         public virtual string Name => "Agent";
         public virtual string Specialty => "General purpose assistant";
         public virtual bool CanHandle(string task) => true;
 
-        public Agent(LLM llm, IList<AITool> tools, string goal, IMcpClient? mcpClient = null)
+        protected Agent(LLM llm, IList<AITool> tools, string goal, IMcpClient? mcpClient = null)
         {
             llm?.Validate();
             
@@ -77,8 +78,37 @@ namespace MoniaAgent
             // Add built-in framework tools
             this.tools.Add(TaskCompleteTool.Create());
             
-            this.goal = goal;
+            this.Goal = goal;
             this.mcpClient = mcpClient;
+        }
+
+        protected Agent(LLM llm, IMcpClient? mcpClient = null)
+        {
+            llm?.Validate();
+            this.llm = llm;
+            this.tools = new List<AITool>();
+            this.Goal = string.Empty; // Will be set by Initialize
+            this.mcpClient = mcpClient;
+        }
+
+        protected void Initialize(IList<AITool> tools, string goal)
+        {
+            if (string.IsNullOrWhiteSpace(goal))
+                throw new ArgumentException("Goal cannot be null or empty", nameof(goal));
+
+            this.tools.Clear();
+            if (tools != null)
+            {
+                foreach (var tool in tools)
+                {
+                    this.tools.Add(tool);
+                }
+            }
+            
+            // Add built-in framework tools
+            this.tools.Add(TaskCompleteTool.Create());
+            
+            this.Goal = goal;
         }
 
         public Task ConnectAsync()
@@ -122,7 +152,7 @@ namespace MoniaAgent
             {
                 var messages = new List<ChatMessage>
                 {
-                    new ChatMessage(ChatRole.System, goal),
+                    new ChatMessage(ChatRole.System, Goal),
                     new ChatMessage(ChatRole.User, prompt)
                 };
 
@@ -297,8 +327,6 @@ namespace MoniaAgent
             {
                 try
                 {
-                    // Try to construct AIFunctionArguments
-                    // Let's check what constructors are available by trial
                     AIFunctionArguments? functionArgs = null;
 
                     if (argumentsDict.Count > 0)

@@ -15,7 +15,7 @@ namespace MoniaAgentTest
             };
 
             // Create a simple agent that should use multiple turns
-            var agent = new Agent(llm, new List<AITool>(), 
+            var agent = new SimpleAgent(llm, 
                 "You are a helpful assistant. Always think step by step and use the task_complete tool when you have finished the task completely.");
             
             await agent.ConnectAsync();

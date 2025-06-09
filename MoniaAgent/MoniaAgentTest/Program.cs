@@ -13,6 +13,11 @@ await mcpTimeAgent.ConnectAsync();
 var timeResult = await mcpTimeAgent.Execute("Quelle heure est il?.");
 Console.WriteLine($"{timeResult}");*/
 
+/*var timeAgent = new TimeAgent(llm);
+await timeAgent.ConnectAsync();
+var timeResult = await timeAgent.Execute("Quelle heure est il?.");
+Console.WriteLine($"{timeResult}"); */
+
 var fileSystemAgent = new FileSystemAgent(llm);
 await fileSystemAgent.ConnectAsync();
 var fileSystemResponse = await fileSystemAgent.Execute("Crée un fichier txt avec le contenu 'coucou' à la racine de ton répertoire autorisé, " +
