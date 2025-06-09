@@ -203,7 +203,8 @@ namespace MoniaAgent.Core
                             /*argsString = toolCall.Arguments != null && toolCall.Arguments.Any() 
                                 ? $"({string.Join(", ", toolCall.Arguments.Select(kvp => $"{kvp.Key}={kvp.Value}"))})" 
                                 : "";*/
-                            var actionDescription = $"- {toolCall.Name}{argsString} --> {toolResult}";
+                            var formattedResult = FormatActionOutput(toolResult);
+                            var actionDescription = $"- {toolCall.Name}{argsString} --> {formattedResult}";
                             actionsSummary.Add(actionDescription);
                             
                             // Real-time display
@@ -347,6 +348,27 @@ namespace MoniaAgent.Core
             }
 
             return $"Error: Tool '{toolCall.Name}' is not an AIFunction";
+        }
+
+        private static string FormatActionOutput(string toolResult)
+        {
+            try
+            {
+                var json = JsonSerializer.Deserialize<JsonElement>(toolResult);
+                if (json.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
+                {
+                    var textContent = content.EnumerateArray()
+                        .Where(item => item.TryGetProperty("type", out var type) && type.GetString() == "text")
+                        .Select(item => item.GetProperty("text").GetString())
+                        .FirstOrDefault();
+                    return textContent ?? toolResult;
+                }
+            }
+            catch
+            {
+                // Fallback to original if parsing fails
+            }
+            return toolResult;
         }
 
     }

@@ -20,12 +20,17 @@ await timeAgent.ConnectAsync();
 var timeResult = await timeAgent.Execute("Quelle heure est il?.");
 Console.WriteLine($"{timeResult}"); */
 
-var fileSystemAgent = new FileSystemAgent(llm);
+/*var fileSystemAgent = new FileSystemAgent(llm);
 await fileSystemAgent.ConnectAsync();
 var fileSystemResponse = await fileSystemAgent.Execute("Crée un fichier txt avec le contenu 'coucou' à la racine de ton répertoire autorisé, " +
     "copie le (ne le coupe pas), " +
     "remplace 'coucou' par 'Hello World' dans le nouveau fichier. A la fin il doit y avoir 2 fichiers, 1 avec 'coucou', l'autre avec 'Hello World'");
-Console.WriteLine($"McpFileSystemAgent result: {fileSystemResponse}");
+Console.WriteLine($"McpFileSystemAgent result: {fileSystemResponse}");*/
+
+var desktopCommanderAgent = new McpDesktopCommanderAgent(llm);
+await desktopCommanderAgent.ConnectAsync();
+var desktopCommanderResponse = await desktopCommanderAgent.Execute("Draw a butterfly in svg. Write the code into a html file. Launch it in a web browser.");
+Console.WriteLine($"McpDesktopCommanderAgent result: {desktopCommanderResponse}");
 
 /*// Create a simple agent that should use multiple turns
 var agent = new SimpleAgent(llm,
