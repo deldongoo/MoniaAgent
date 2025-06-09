@@ -34,7 +34,7 @@ namespace MoniaAgent
 
         public IClientTransport GetTransport()
         {
-            IClientTransport clientTransport = null;
+            IClientTransport? clientTransport = null;
             switch (String.IsNullOrEmpty(Url)) {
                 case true:
                     clientTransport = new StdioClientTransport(new StdioClientTransportOptions
@@ -53,7 +53,7 @@ namespace MoniaAgent
                     });
                     break;
             }    
-            return clientTransport; 
+            return clientTransport!; 
         }
     }
 }

@@ -8,7 +8,19 @@ var llm = new LLM
     Model = "openai/gpt-4o"
 };
 
-// Create orchestrator and register agents
+/*var mcpTimeAgent = new McpTimeAgent(llm);
+await mcpTimeAgent.ConnectAsync();
+var timeResult = await mcpTimeAgent.Execute("Quelle heure est il?.");
+Console.WriteLine($"McpTimeAgent result: {timeResult}");*/
+
+var fileSystemAgent = new FileSystemAgent(llm);
+await fileSystemAgent.ConnectAsync();
+var fileSystemResponse = await fileSystemAgent.Execute("Crée un fichier txt avec le contenu 'coucou' à la racine de ton répertoire autorisé, " +
+    "copie le (ne le coupe pas), " +
+    "remplace 'coucou' par 'Hello World' dans le nouveau fichier. A la fin il doit y avoir 2 fichiers, 1 avec 'coucou', l'autre avec 'Hello World'");
+Console.WriteLine($"McpFileSystemAgent result: {fileSystemResponse}");
+
+/*// Create orchestrator and register agents
 var orchestrator = new AgentOrchestrator();
 
 var timeAgent = new TimeAgent(llm);
@@ -34,3 +46,7 @@ Console.WriteLine($"Desktop query → {desktopResponse}");
 
 var generalResponse = await orchestrator.Execute("Hello, how are you?");
 Console.WriteLine($"General query → {generalResponse}");
+
+// Test the conversational loop
+Console.WriteLine("\n=== Testing Conversational Loop Directly ===");
+await ConversationalTest.TestConversationalLoop();*/

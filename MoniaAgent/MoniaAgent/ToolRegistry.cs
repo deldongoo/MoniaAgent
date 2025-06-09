@@ -1,6 +1,9 @@
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using System.Collections.Generic;
+using System.Text.Json;
 
 namespace MoniaAgent
 {
@@ -9,9 +12,9 @@ namespace MoniaAgent
         private static readonly ILoggerFactory loggerFactory = LoggerFactory.Create(builder => 
             builder.AddConsole().SetMinimumLevel(LogLevel.Information));
         private static readonly ILogger logger = loggerFactory.CreateLogger<ToolRegistry>();
-        private readonly List<Tool> tools = new List<Tool>();
+        public readonly List<AITool> tools = new List<AITool>();
 
-        public void RegisterTool(Tool tool)
+        public void RegisterTool(AITool tool)
         {
             tools.Add(tool);
             logger.LogInformation("Registered tool: {ToolName}", tool.Name);
@@ -23,23 +26,34 @@ namespace MoniaAgent
             
             try
             {
+                logger.LogDebug("Connecting to MCP server '{ServerName}'", server!.Name);
                 IClientTransport clientTransport = server.GetTransport();
                 var mcpClient = await McpClientFactory.CreateAsync(clientTransport);
-                var mcpTools = await mcpClient.ListToolsAsync();
-                var adaptedTools = mcpTools.Select(t => new McpTool(t, mcpClient));
                 
-                tools.AddRange(adaptedTools);
+                logger.LogDebug("Listing tools from MCP server '{ServerName}'", server.Name);
+                var mcpTools = await mcpClient.ListToolsAsync();
+                
+                logger.LogDebug("Found {ToolCount} tools from MCP server '{ServerName}':", mcpTools.Count(), server.Name);
+                foreach (var tool in mcpTools)
+                {
+                    logger.LogDebug("  - {ToolName}: {ToolDescription}", tool.Name, tool.Description);
+                }
+        
+                tools.AddRange(mcpTools);
                 logger.LogInformation("Successfully loaded {ToolCount} tools from MCP server '{ServerName}'", 
                     mcpTools.Count(), server.Name);
+                
+                logger.LogDebug("Total tools in registry after MCP server: {TotalCount}", tools.Count);
             }
             catch (Exception ex)
             {
                 logger.LogWarning("MCP server '{ServerName}' failed to load: {ErrorMessage}", 
-                    server.Name, ex.Message);
+                    server!.Name, ex.Message);
+                logger.LogDebug(ex, "Full exception details for MCP server '{ServerName}'", server!.Name);
             }
         }
 
-        public IList<Tool> GetAllTools()
+        public IList<AITool> GetAllTools()
         {
             return tools.AsReadOnly();
         }

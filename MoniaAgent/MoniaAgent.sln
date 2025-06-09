@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoniaAgent", "MoniaAgent\Mo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoniaAgentTest", "MoniaAgentTest\MoniaAgentTest.csproj", "{A1125173-5683-4FA9-9FBA-3157A42F8693}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McpServerTime", "McpServerTime\McpServerTime.csproj", "{B4FB40F5-6295-4DD2-99E8-D68AFFA5C454}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{A1125173-5683-4FA9-9FBA-3157A42F8693}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1125173-5683-4FA9-9FBA-3157A42F8693}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1125173-5683-4FA9-9FBA-3157A42F8693}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B4FB40F5-6295-4DD2-99E8-D68AFFA5C454}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4FB40F5-6295-4DD2-99E8-D68AFFA5C454}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4FB40F5-6295-4DD2-99E8-D68AFFA5C454}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4FB40F5-6295-4DD2-99E8-D68AFFA5C454}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

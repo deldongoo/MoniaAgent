@@ -1,3 +1,4 @@
+using Microsoft.Extensions.AI;
 using MoniaAgent;
 
 namespace MoniaAgentTest
@@ -17,10 +18,10 @@ namespace MoniaAgentTest
         {
         }
         
-        private static IList<Tool> CreateTimeTools()
+        private static IList<AITool> CreateTimeTools()
         {
             var registry = new ToolRegistry();
-            registry.RegisterTool(new CurrentTimeTool());
+            registry.RegisterTool(CurrentTimeTool.Create());
             return registry.GetAllTools();
         }
         
