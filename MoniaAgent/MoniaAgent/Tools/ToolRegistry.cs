@@ -30,25 +30,27 @@ namespace MoniaAgent.Tools
                 var mcpClient = await McpClientFactory.CreateAsync(clientTransport);
                 var mcpTools = await mcpClient.ListToolsAsync();
                 tools.AddRange(mcpTools);
-
-              /*  logger.LogDebug("Connecting to MCP server '{ServerName}'", server!.Name);
-                IClientTransport clientTransport = server.GetTransport();
-                var mcpClient = await McpClientFactory.CreateAsync(clientTransport);
-                
-                logger.LogDebug("Listing tools from MCP server '{ServerName}'", server.Name);
-                var mcpTools = await mcpClient.ListToolsAsync();
-                
-                logger.LogDebug("Found {ToolCount} tools from MCP server '{ServerName}':", mcpTools.Count(), server.Name);
-                foreach (var tool in mcpTools)
-                {
-                    logger.LogDebug("  - {ToolName}: {ToolDescription}", tool.Name, tool.Description);
-                }
-        
-                tools.AddRange(mcpTools);
-                logger.LogInformation("Successfully loaded {ToolCount} tools from MCP server '{ServerName}'", 
+                logger.LogInformation("Successfully loaded {ToolCount} tools from MCP server '{ServerName}'",
                     mcpTools.Count(), server.Name);
-                
-                logger.LogDebug("Total tools in registry after MCP server: {TotalCount}", tools.Count);*/
+
+                /*  logger.LogDebug("Connecting to MCP server '{ServerName}'", server!.Name);
+                  IClientTransport clientTransport = server.GetTransport();
+                  var mcpClient = await McpClientFactory.CreateAsync(clientTransport);
+
+                  logger.LogDebug("Listing tools from MCP server '{ServerName}'", server.Name);
+                  var mcpTools = await mcpClient.ListToolsAsync();
+
+                  logger.LogDebug("Found {ToolCount} tools from MCP server '{ServerName}':", mcpTools.Count(), server.Name);
+                  foreach (var tool in mcpTools)
+                  {
+                      logger.LogDebug("  - {ToolName}: {ToolDescription}", tool.Name, tool.Description);
+                  }
+
+                  tools.AddRange(mcpTools);
+                  logger.LogInformation("Successfully loaded {ToolCount} tools from MCP server '{ServerName}'", 
+                      mcpTools.Count(), server.Name);
+
+                  logger.LogDebug("Total tools in registry after MCP server: {TotalCount}", tools.Count);*/
             }
             catch (Exception ex)
             {

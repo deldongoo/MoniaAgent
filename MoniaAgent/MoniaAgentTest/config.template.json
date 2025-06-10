@@ -1,0 +1,7 @@
+{
+  "LLM": {
+    "BaseUrl": "https://openrouter.ai/api/v1",
+    "ApiKey": "your-api-key-here",
+    "Model": "openai/gpt-4o"
+  }
+}

@@ -2,18 +2,21 @@
 using MoniaAgent.Configuration;
 using MoniaAgent.Core;
 using MoniaAgentTest;
+using Microsoft.Extensions.Configuration;
 
-var llm = new LLM
-{
-    BaseUrl = "https://openrouter.ai/api/v1",
-    ApiKey = "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",
-    Model = "openai/gpt-4o"
-};
+// Load configuration from JSON file
+var configuration = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("config.json", optional: false, reloadOnChange: true)
+    .Build();
 
-/*var mcpTimeAgent = new McpTimeAgent(llm);
+var llm = new LLM();
+configuration.GetSection("LLM").Bind(llm);
+
+var mcpTimeAgent = new McpTimeAgent(llm);
 await mcpTimeAgent.ConnectAsync();
 var timeResult = await mcpTimeAgent.Execute("Quelle heure est il?.");
-Console.WriteLine($"{timeResult}");*/
+Console.WriteLine($"{timeResult}");
 
 /*var timeAgent = new TimeAgent(llm);
 await timeAgent.ConnectAsync();
@@ -27,10 +30,10 @@ var fileSystemResponse = await fileSystemAgent.Execute("Crée un fichier txt ave
     "remplace 'coucou' par 'Hello World' dans le nouveau fichier. A la fin il doit y avoir 2 fichiers, 1 avec 'coucou', l'autre avec 'Hello World'");
 Console.WriteLine($"McpFileSystemAgent result: {fileSystemResponse}");*/
 
-var desktopCommanderAgent = new McpDesktopCommanderAgent(llm);
+/*var desktopCommanderAgent = new McpDesktopCommanderAgent(llm);
 await desktopCommanderAgent.ConnectAsync();
 var desktopCommanderResponse = await desktopCommanderAgent.Execute("Draw a butterfly in svg. Write the code into a html file. Launch it in a web browser.");
-Console.WriteLine($"McpDesktopCommanderAgent result: {desktopCommanderResponse}");
+Console.WriteLine($"McpDesktopCommanderAgent result: {desktopCommanderResponse}");*/
 
 /*// Create a simple agent that should use multiple turns
 var agent = new SimpleAgent(llm,

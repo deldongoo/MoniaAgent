@@ -9,7 +9,7 @@ namespace MoniaAgent.Tools
         {
             return AIFunctionFactory.Create(
                 (string? actions) => GenerateTaskSummary(actions),
-                "task_complete",
+                "TaskComplete",
                 "Call this when the task is completed successfully. Optionally provide a summary of actions performed. This discussion ends here, no more tool calls");
         }
 

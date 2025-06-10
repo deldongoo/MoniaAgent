@@ -184,7 +184,7 @@ namespace MoniaAgent.Core
                             var textContent = message.Contents.OfType<TextContent>().FirstOrDefault()?.Text;
                             if (!string.IsNullOrEmpty(textContent))
                             {
-                                Console.WriteLine($"[RESPONSE] {textContent}");
+                                Console.WriteLine($"[TEXT] {textContent}");
                             }
                         }
                         
@@ -208,10 +208,10 @@ namespace MoniaAgent.Core
                             actionsSummary.Add(actionDescription);
                             
                             // Real-time display
-                            Console.WriteLine($"[ACTION] {actionDescription}");
+                            Console.WriteLine($"[TOOLCALL] {actionDescription}");
                             
                             // If task_complete was called, return its result immediately
-                            if (toolCall.Name == "task_complete")
+                            if (toolCall.Name == "TaskComplete")
                             {
                                 return "Exit";
                             }
@@ -232,7 +232,7 @@ namespace MoniaAgent.Core
                         // Log text responses
                         if (!string.IsNullOrEmpty(lastTextResponse))
                         {
-                            Console.WriteLine($"[RESPONSE] {lastTextResponse}");
+                            Console.WriteLine($"[TEXT] {lastTextResponse}");
                         }
                         
                         if (lastMessage != null)
