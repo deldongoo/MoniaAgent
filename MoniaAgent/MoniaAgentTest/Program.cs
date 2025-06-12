@@ -1,6 +1,8 @@
 ﻿using MoniaAgent.Agents;
 using MoniaAgent.Configuration;
 using MoniaAgent.Core;
+using MoniaAgent.Core.Inputs;
+using MoniaAgent.Core.Outputs;
 using MoniaAgentTest;
 using Microsoft.Extensions.Configuration;
 
@@ -15,8 +17,16 @@ configuration.GetSection("LLM").Bind(llm);
 
 var mcpTimeAgent = new McpTimeAgent(llm);
 await mcpTimeAgent.ConnectAsync();
-var timeResult = await mcpTimeAgent.Execute("Quelle heure est il?.");
-Console.WriteLine($"{timeResult}");
+var timeResult = await mcpTimeAgent.ExecuteAsync(new TextInput("Quelle heure est il?."));
+Console.WriteLine($"Success: {timeResult.Success}");
+if (timeResult is TextOutput textOutput)
+{
+    Console.WriteLine($"Content: {textOutput.Content}");
+}
+else
+{
+    Console.WriteLine($"Error: {timeResult.ErrorMessage}");
+}
 
 /*var timeAgent = new TimeAgent(llm);
 await timeAgent.ConnectAsync();

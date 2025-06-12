@@ -108,3 +108,7 @@ MCP servers provide external tools to agents. The framework:
 ## Guiding Principles
 
 - MoniaAgent should always be programmed in order to be easy to implement outside the framework.
+
+## Coding Guidelines
+
+- please do not create files with multiple class unless i ask for it

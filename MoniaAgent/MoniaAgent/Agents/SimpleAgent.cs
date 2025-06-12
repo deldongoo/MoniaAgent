@@ -1,9 +1,12 @@
 using System;
 using MoniaAgent.Configuration;
+using MoniaAgent.Core;
+using MoniaAgent.Core.Inputs;
+using MoniaAgent.Core.Outputs;
 
 namespace MoniaAgent.Agents
 {
-    public class SimpleAgent : SpecializedAgent
+    public class SimpleAgent : TypedAgent<TextInput, TextOutput>
     {
         private readonly string customGoal;
         
@@ -23,5 +26,17 @@ namespace MoniaAgent.Agents
         };
         
         public override bool CanHandle(string task) => true;
+
+
+        // Implement abstract method for string to output conversion
+        protected override TextOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
+        {
+            return new TextOutput
+            {
+                Success = !textResult.Contains("Error") && !textResult.Contains("Failed"),
+                Content = textResult,
+                Metadata = metadata
+            };
+        }
     }
 }

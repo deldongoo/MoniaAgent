@@ -9,7 +9,7 @@ using MoniaAgent.Tools;
 
 namespace MoniaAgent.Agents
 {
-    public abstract class SpecializedAgent : Agent
+  /*  public abstract class SpecializedAgent : Agent
     {
         private readonly AgentConfig config;
 
@@ -56,5 +56,5 @@ namespace MoniaAgent.Agents
 
             return registry.GetAllTools();
         }
-    }
+    }*/
 }

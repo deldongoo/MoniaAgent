@@ -1,9 +1,11 @@
-using MoniaAgent.Agents;
+using MoniaAgent.Core;
+using MoniaAgent.Core.Inputs;
+using MoniaAgent.Core.Outputs;
 using MoniaAgent.Configuration;
 
 namespace MoniaAgentTest
 {
-    public class McpTimeAgent : SpecializedAgent
+    public class McpTimeAgent : TypedAgent<TextInput, TextOutput>
     {
         public McpTimeAgent(LLM llm) : base(llm)
         {
@@ -34,5 +36,12 @@ namespace MoniaAgentTest
 
                     Use the available time tools to complete user requests. Call task_complete when finished."
         };
+
+
+        // Implement abstract method for string to output conversion
+        protected override TextOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
+        {
+            return new TextOutput { Success = !textResult.Contains("Error") && !textResult.Contains("Failed"), Content = textResult, Metadata = metadata };
+        }
     }
 }

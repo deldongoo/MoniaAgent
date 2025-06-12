@@ -11,6 +11,8 @@ using System.Text.Json;
 using ModelContextProtocol.Client;
 using MoniaAgent.Configuration;
 using MoniaAgent.Tools;
+using MoniaAgent.Core.Inputs;
+using MoniaAgent.Core.Outputs;
 
 namespace MoniaAgent.Core
 {
@@ -65,7 +67,14 @@ namespace MoniaAgent.Core
         // IAgent implementation
         public virtual string Name => "Agent";
         public virtual string Specialty => "General purpose assistant";
+        public virtual Type[] SupportedInputTypes => new[] { typeof(AgentInput) };
+        public virtual Type ExpectedOutputType => typeof(AgentOutput);
         public virtual bool CanHandle(string task) => true;
+
+        public virtual Task<string> Execute(string prompt)
+        {
+            return ExecuteInternal(prompt);
+        }
 
         protected Agent(LLM llm, IList<AITool> tools, string goal, IMcpClient? mcpClient = null)
         {
@@ -145,7 +154,7 @@ namespace MoniaAgent.Core
         }
 
 
-        public async Task<string> Execute(string prompt)
+        protected async Task<string> ExecuteInternal(string prompt)
         {
             if (chatClient == null)
                 await ConnectAsync();
@@ -200,9 +209,9 @@ namespace MoniaAgent.Core
 
                             // Track action for summary
                             var argsString = "";
-                            /*argsString = toolCall.Arguments != null && toolCall.Arguments.Any() 
+                            argsString = toolCall.Arguments != null && toolCall.Arguments.Any() 
                                 ? $"({string.Join(", ", toolCall.Arguments.Select(kvp => $"{kvp.Key}={kvp.Value}"))})" 
-                                : "";*/
+                                : "";
                             var formattedResult = FormatActionOutput(toolResult);
                             var actionDescription = $"- {toolCall.Name}{argsString} --> {formattedResult}";
                             actionsSummary.Add(actionDescription);
@@ -263,6 +272,70 @@ namespace MoniaAgent.Core
                 logger.LogError(ex, "Error communicating with API");
                 throw new Exception($"Error communicating with API: {ex.Message}", ex);
             }
+        }
+
+        public virtual async Task<AgentOutput> ExecuteAsync(AgentInput input, CancellationToken cancellationToken = default)
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var executionMetadata = new ExecutionMetadata
+            {
+                StartTime = DateTime.UtcNow,
+                AgentName = Name
+            };
+            
+            try
+            {
+                // Convert typed input to prompt
+                string prompt = ConvertInputToPrompt(input);
+                
+                // Use existing Execute logic
+                string textResult = await ExecuteInternal(prompt);
+                
+                // Convert string result to typed result
+                var result = ConvertToTypedResult(textResult, executionMetadata);
+                
+                result.Metadata = executionMetadata;
+                result.Metadata.EndTime = DateTime.UtcNow;
+                
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return CreateErrorResult(ex, executionMetadata);
+            }
+        }
+        
+        // Virtual method that specialized agents can override
+        protected virtual string ConvertInputToPrompt(AgentInput input)
+        {
+            return input switch
+            {
+                TextInput textInput => textInput.Prompt,
+                _ => System.Text.Json.JsonSerializer.Serialize(input)
+            };
+        }
+        
+        // Virtual method for converting results
+        protected virtual AgentOutput ConvertToTypedResult(string textResult, ExecutionMetadata metadata)
+        {
+            // Default implementation returns TextOutput
+            return new TextOutput
+            {
+                Success = !textResult.Contains("Error") && !textResult.Contains("Failed"),
+                Content = textResult,
+                Metadata = metadata
+            };
+        }
+        
+        protected virtual AgentOutput CreateErrorResult(Exception ex, ExecutionMetadata metadata)
+        {
+            return new TextOutput
+            {
+                Success = false,
+                ErrorMessage = ex.Message,
+                Content = string.Empty,
+                Metadata = metadata
+            };
         }
 
         private async Task<string> ExecuteToolManually(FunctionCallContent toolCall)

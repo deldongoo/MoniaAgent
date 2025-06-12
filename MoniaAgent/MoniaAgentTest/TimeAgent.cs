@@ -1,10 +1,12 @@
-using MoniaAgent.Agents;
+using MoniaAgent.Core;
+using MoniaAgent.Core.Inputs;
+using MoniaAgent.Core.Outputs;
 using MoniaAgent.Configuration;
 using System.ComponentModel;
 
 namespace MoniaAgentTest
 {
-    public class TimeAgent : SpecializedAgent
+    public class TimeAgent : TypedAgent<TextInput, TextOutput>
     {
         public TimeAgent(LLM llm) : base(llm)
         {
@@ -24,6 +26,18 @@ namespace MoniaAgentTest
         {
             DateTime dateTime = DateTime.Now;
             return dateTime.ToString("yyyy-MM-dd HH:mm:ss zzz");
+        }
+
+
+        // Implement abstract method for string to output conversion
+        protected override TextOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
+        {
+            return new TextOutput
+            {
+                Success = !textResult.Contains("Error") && !textResult.Contains("Failed"),
+                Content = textResult,
+                Metadata = metadata
+            };
         }
     }
 }

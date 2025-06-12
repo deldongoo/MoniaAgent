@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using MoniaAgent.Agents;
+using MoniaAgent.Core.Inputs;
+using MoniaAgent.Core.Outputs;
 
 namespace MoniaAgent.Core
 {
@@ -13,22 +15,22 @@ namespace MoniaAgent.Core
             builder.AddConsole().SetMinimumLevel(LogLevel.Information));
         private static readonly ILogger logger = loggerFactory.CreateLogger<AgentOrchestrator>();
 
-        private readonly List<IAgent> agents = new List<IAgent>();
+        private readonly List<Agent> agents = new List<Agent>();
 
-        public void RegisterAgent<T>(T agent) where T : SpecializedAgent
+        public void RegisterAgent(Agent agent)
         {
             agents.Add(agent);
             logger.LogInformation("Registered agent: {AgentName} - {Specialty}", agent.Name, agent.Specialty);
         }
 
-        public async Task<string> Execute(string task)
+        public async Task<AgentOutput> Execute(string task)
         {
             var selectedAgent = SelectBestAgent(task);
             logger.LogInformation("Selected agent {AgentName} for task: {Task}", selectedAgent.Name, task);
-            return await selectedAgent.Execute(task);
+            return await selectedAgent.ExecuteAsync(new TextInput(task));
         }
 
-        private IAgent SelectBestAgent(string task)
+        private Agent SelectBestAgent(string task)
         {
             var capableAgents = agents.Where(a => a.CanHandle(task)).ToList();
             
