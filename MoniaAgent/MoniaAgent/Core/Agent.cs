@@ -222,7 +222,10 @@ namespace MoniaAgent.Core
                             // If task_complete was called, return its result immediately
                             if (toolCall.Name == "TaskComplete")
                             {
-                                return "Exit";
+                                var finalSummary = string.IsNullOrEmpty(lastTextResponse)
+                                    ? $"Actions performed:\n{string.Join("\n", actionsSummary)}"
+                                    : $"{lastTextResponse}\n\nActions performed:\n{string.Join("\n", actionsSummary)}";
+                                return finalSummary;
                             }
                             
                             // Add tool result as message
@@ -256,14 +259,14 @@ namespace MoniaAgent.Core
                     }
                 }
 
-                /*// Return summary if actions were performed, otherwise last text response
+                // Return summary if actions were performed, otherwise last text response
                 if (actionsSummary.Count > 0)
                 {
                     var finalSummary = string.IsNullOrEmpty(lastTextResponse) 
                         ? $"Actions performed:\n{string.Join("\n", actionsSummary)}"
                         : $"{lastTextResponse}\n\nActions performed:\n{string.Join("\n", actionsSummary)}";
                     return finalSummary;
-                }*/
+                }
                 
                 return lastTextResponse;
             }

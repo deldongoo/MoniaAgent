@@ -28,6 +28,23 @@ else
     Console.WriteLine($"Error: {timeResult.ErrorMessage}");
 }
 
+/*Console.WriteLine("\n=== Testing FileReaderAgent ===");
+var fileReaderAgent = new FileReaderAgent(llm);
+await fileReaderAgent.ConnectAsync();
+var fileResult = await fileReaderAgent.ExecuteAsync(new FileInput("test-file.txt"));
+Console.WriteLine($"File read success: {fileResult.Success}");
+if (fileResult.Success)
+{
+    Console.WriteLine($"File Path: {fileResult.FilePath}");
+    Console.WriteLine($"File Size: {fileResult.FileSize} bytes");
+    Console.WriteLine($"Last Modified: {fileResult.LastModified}");
+    Console.WriteLine($"Content:\n{fileResult.Content}");
+}
+else
+{
+    Console.WriteLine($"Error: {fileResult.ErrorMessage}");
+}*/
+
 /*var timeAgent = new TimeAgent(llm);
 await timeAgent.ConnectAsync();
 var timeResult = await timeAgent.Execute("Quelle heure est il?.");

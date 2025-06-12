@@ -59,39 +59,79 @@ namespace MoniaAgent.Agents
         {
             var result = new FileOutput
             {
-                Success = !textResult.Contains("Error"),
-                Content = textResult,
                 Operation = FileOperation.Read,
                 Metadata = metadata
             };
 
-            // Try to extract file path from the result or metadata
-            if (textResult.StartsWith("File: "))
+            // Parse the action summary format
+            if (textResult.StartsWith("Actions performed:"))
             {
-                var lines = textResult.Split('\n');
-                if (lines.Length > 0)
-                {
-                    result.FilePath = lines[0].Substring(6); // Remove "File: " prefix
-                }
+                // Extract ReadFileContent action result
+                var readFileContentMatch = System.Text.RegularExpressions.Regex.Match(
+                    textResult, 
+                    @"ReadFileContent\([^)]+\) --> (.+?)(?=- TaskComplete|\z)", 
+                    System.Text.RegularExpressions.RegexOptions.Singleline);
 
-                // Try to extract file size
-                var sizeLine = lines.FirstOrDefault(l => l.StartsWith("Size: "));
-                if (sizeLine != null && long.TryParse(sizeLine.Split(' ')[1], out var size))
+                if (readFileContentMatch.Success)
                 {
-                    result.FileSize = size;
-                }
+                    var fileContentResult = readFileContentMatch.Groups[1].Value.Trim();
+                    
+                    // Parse file metadata
+                    var lines = fileContentResult.Split('\n');
+                    
+                    // Extract file path
+                    var filePathLine = lines.FirstOrDefault(l => l.StartsWith("File: "));
+                    if (filePathLine != null)
+                    {
+                        result.FilePath = filePathLine.Substring(6).Trim();
+                    }
 
-                // Try to extract last modified date
-                var modifiedLine = lines.FirstOrDefault(l => l.StartsWith("Last Modified: "));
-                if (modifiedLine != null && DateTime.TryParse(modifiedLine.Substring(15), out var lastModified))
+                    // Extract file size
+                    var sizeLine = lines.FirstOrDefault(l => l.StartsWith("Size: "));
+                    if (sizeLine != null)
+                    {
+                        var sizeMatch = System.Text.RegularExpressions.Regex.Match(sizeLine, @"Size: (\d+)");
+                        if (sizeMatch.Success && long.TryParse(sizeMatch.Groups[1].Value, out var size))
+                        {
+                            result.FileSize = size;
+                        }
+                    }
+
+                    // Extract last modified date
+                    var modifiedLine = lines.FirstOrDefault(l => l.StartsWith("Last Modified: "));
+                    if (modifiedLine != null && DateTime.TryParse(modifiedLine.Substring(15).Trim(), out var lastModified))
+                    {
+                        result.LastModified = lastModified;
+                    }
+
+                    // Extract actual file content
+                    var contentIndex = Array.FindIndex(lines, l => l.StartsWith("Content:"));
+                    if (contentIndex >= 0 && contentIndex < lines.Length - 1)
+                    {
+                        var contentLines = lines.Skip(contentIndex + 1).ToArray();
+                        result.Content = string.Join("\n", contentLines).Trim();
+                    }
+
+                    // Success if we have valid file data
+                    result.Success = !string.IsNullOrEmpty(result.FilePath) && !string.IsNullOrEmpty(result.Content);
+                }
+                else
                 {
-                    result.LastModified = lastModified;
+                    result.Success = false;
+                    result.ErrorMessage = "Could not parse file reading result from action summary";
+                    result.Content = textResult;
                 }
             }
-
-            if (!result.Success)
+            else
             {
-                result.ErrorMessage = textResult.Contains("Error") ? textResult : "Unknown error occurred";
+                // Fallback to original logic for backward compatibility
+                result.Success = !textResult.Contains("Error");
+                result.Content = textResult;
+                
+                if (!result.Success)
+                {
+                    result.ErrorMessage = textResult.Contains("Error") ? textResult : "Unknown error occurred";
+                }
             }
 
             return result;
