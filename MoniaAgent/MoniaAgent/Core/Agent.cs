@@ -149,7 +149,7 @@ namespace MoniaAgent.Core
         }
 
 
-        protected async Task<string> ExecuteInternal(string prompt)
+        protected async Task<string> ExecuteInternal(string prompt, ExecutionMetadata executionMetadata)
         {
             if (chatClient == null)
                 await ConnectAsync();
@@ -170,7 +170,6 @@ namespace MoniaAgent.Core
                 const int maxTurns = 10;
                 int consecutiveNonToolMessages = 0;
                 string lastTextResponse = "";
-                var actionsSummary = new List<string>();
 
                 for (int turn = 0; turn < maxTurns; turn++)
                 {
@@ -202,24 +201,27 @@ namespace MoniaAgent.Core
                             // Execute tool manually
                             var toolResult = await ExecuteToolManually(toolCall);
 
-                            // Track action for summary
-                            var argsString = "";
-                            argsString = toolCall.Arguments != null && toolCall.Arguments.Any() 
-                                ? $"({string.Join(", ", toolCall.Arguments.Select(kvp => $"{kvp.Key}={kvp.Value}"))})" 
-                                : "";
-                            var formattedResult = FormatActionOutput(toolResult);
-                            var actionDescription = $"- {toolCall.Name}{argsString} --> {formattedResult}";
-                            actionsSummary.Add(actionDescription);
+                            // Track action in metadata
+                            var performedAction = new PerformedAction
+                            {
+                                ToolName = toolCall.Name,
+                                Arguments = toolCall.Arguments?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? new(),
+                                Result = FormatActionOutput(toolResult),
+                                Timestamp = DateTime.UtcNow
+                            };
+                            executionMetadata.PerformedActions.Add(performedAction);
                             
                             // Real-time display
+                            var actionDescription = FormatActionForDisplay(performedAction);
                             Console.WriteLine($"[TOOLCALL] {actionDescription}");
                             
                             // If task_complete was called, return its result immediately
                             if (toolCall.Name == "TaskComplete")
                             {
+                                var actionSummaries = executionMetadata.PerformedActions.Select(FormatActionForDisplay);
                                 var finalSummary = string.IsNullOrEmpty(lastTextResponse)
-                                    ? $"Actions performed:\n{string.Join("\n", actionsSummary)}"
-                                    : $"{lastTextResponse}\n\nActions performed:\n{string.Join("\n", actionsSummary)}";
+                                    ? $"Actions performed:\n{string.Join("\n", actionSummaries)}"
+                                    : $"{lastTextResponse}\n\nActions performed:\n{string.Join("\n", actionSummaries)}";
                                 return finalSummary;
                             }
                             
@@ -255,11 +257,12 @@ namespace MoniaAgent.Core
                 }
 
                 // Return summary if actions were performed, otherwise last text response
-                if (actionsSummary.Count > 0)
+                if (executionMetadata.PerformedActions.Count > 0)
                 {
+                    var actionSummaries = executionMetadata.PerformedActions.Select(FormatActionForDisplay);
                     var finalSummary = string.IsNullOrEmpty(lastTextResponse) 
-                        ? $"Actions performed:\n{string.Join("\n", actionsSummary)}"
-                        : $"{lastTextResponse}\n\nActions performed:\n{string.Join("\n", actionsSummary)}";
+                        ? $"Actions performed:\n{string.Join("\n", actionSummaries)}"
+                        : $"{lastTextResponse}\n\nActions performed:\n{string.Join("\n", actionSummaries)}";
                     return finalSummary;
                 }
                 
@@ -287,7 +290,7 @@ namespace MoniaAgent.Core
                 string prompt = ConvertInputToPrompt(input);
                 
                 // Use existing Execute logic
-                string textResult = await ExecuteInternal(prompt);
+                string textResult = await ExecuteInternal(prompt, executionMetadata);
                 
                 // Convert string result to typed result
                 var result = ConvertToTypedResult(textResult, executionMetadata);
@@ -440,6 +443,14 @@ namespace MoniaAgent.Core
                 // Fallback to original if parsing fails
             }
             return toolResult;
+        }
+
+        private static string FormatActionForDisplay(PerformedAction action)
+        {
+            var argsString = action.Arguments.Count > 0
+                ? $"({string.Join(", ", action.Arguments.Select(kvp => $"{kvp.Key}={kvp.Value}"))})"
+                : "";
+            return $"- {action.ToolName}{argsString} --> {action.Result}";
         }
 
     }

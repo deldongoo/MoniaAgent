@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace MoniaAgent.Core.Outputs
 {
@@ -11,5 +12,6 @@ namespace MoniaAgent.Core.Outputs
         public DateTime EndTime { get; set; }
         public TimeSpan Duration => EndTime - StartTime;
         public string AgentName { get; set; } = string.Empty;
+        public List<PerformedAction> PerformedActions { get; set; } = new();
     }
 }
