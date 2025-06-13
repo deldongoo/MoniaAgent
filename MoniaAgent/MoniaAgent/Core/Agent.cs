@@ -71,11 +71,6 @@ namespace MoniaAgent.Core
         public virtual Type ExpectedOutputType => typeof(AgentOutput);
         public virtual bool CanHandle(string task) => true;
 
-        public virtual Task<string> Execute(string prompt)
-        {
-            return ExecuteInternal(prompt);
-        }
-
         protected Agent(LLM llm, IList<AITool> tools, string goal, IMcpClient? mcpClient = null)
         {
             llm?.Validate();

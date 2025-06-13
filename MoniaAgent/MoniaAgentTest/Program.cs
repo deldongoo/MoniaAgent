@@ -5,6 +5,7 @@ using MoniaAgent.Core.Inputs;
 using MoniaAgent.Core.Outputs;
 using MoniaAgentTest;
 using Microsoft.Extensions.Configuration;
+using MoniaAgentTest.Agents;
 
 // Load configuration from JSON file
 var configuration = new ConfigurationBuilder()
@@ -15,7 +16,25 @@ var configuration = new ConfigurationBuilder()
 var llm = new LLM();
 configuration.GetSection("LLM").Bind(llm);
 
-var mcpTimeAgent = new McpTimeAgent(llm);
+var fileReaderAgent = new FileReaderAgent(llm);
+await fileReaderAgent.ConnectAsync();
+Console.WriteLine($"------------------------------------------------------------------------------------------------------------------------");
+var fileReaderResponse = await fileReaderAgent.ExecuteAsync("Read test-file.txt");
+Console.WriteLine($"------------------------------------------------------------------------------------------------------------------------");
+Console.WriteLine($"Success: {fileReaderResponse.Success}");
+Console.WriteLine($"{fileReaderResponse.Content}");
+
+var guardRailAgent = new GuardRailAgent(llm);
+await guardRailAgent.ConnectAsync();
+Console.WriteLine($"------------------------------------------------------------------------------------------------------------------------");
+var guardRailResponse = await guardRailAgent.ExecuteAsync($"Is the following content dangerous, risky, prohibited, or reprehensible? " +
+    $"Answer yes or no and explain why. Content: {fileReaderResponse.Content} ");
+Console.WriteLine($"------------------------------------------------------------------------------------------------------------------------");
+Console.WriteLine($"Safe: {guardRailResponse.IsSafe}");
+Console.WriteLine($"RiskLevel: {guardRailResponse.RiskLevel}");
+Console.WriteLine($"Why?: {guardRailResponse.Summary}");
+
+/*var mcpTimeAgent = new McpTimeAgent(llm);
 await mcpTimeAgent.ConnectAsync();
 var timeResult = await mcpTimeAgent.ExecuteAsync(new TextInput("Quelle heure est il?."));
 Console.WriteLine($"Success: {timeResult.Success}");
@@ -26,7 +45,7 @@ if (timeResult is TextOutput textOutput)
 else
 {
     Console.WriteLine($"Error: {timeResult.ErrorMessage}");
-}
+}*/
 
 /*Console.WriteLine("\n=== Testing FileReaderAgent ===");
 var fileReaderAgent = new FileReaderAgent(llm);

@@ -4,7 +4,7 @@ using MoniaAgent.Core.Outputs;
 using MoniaAgent.Configuration;
 using System.ComponentModel;
 
-namespace MoniaAgentTest
+namespace MoniaAgentTest.Agents
 {
     public class TimeAgent : TypedAgent<TextInput, TextOutput>
     {

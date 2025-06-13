@@ -49,20 +49,20 @@ namespace MoniaAgent.Core
         // Override base ExecuteAsync to handle type validation
         public override async Task<AgentOutput> ExecuteAsync(AgentInput input, CancellationToken cancellationToken = default)
         {
-            if (input is not TInput)
+            if (input is not TInput typedInput)
             {
                 return CreateTypedError($"Invalid input type. Expected {typeof(TInput).Name}, got {input.GetType().Name}");
             }
             
-            // Let base class handle execution using existing logic
-            return await base.ExecuteAsync(input, cancellationToken);
+            return await ExecuteAsync(typedInput, cancellationToken);
         }
 
-        // Typed version for strongly typed implementations
+        // Typed version - primary implementation
         public virtual async Task<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
         {
-            // This calls the base AgentInput version, which uses ConvertToTypedResult
-            return (TOutput)await ExecuteAsync((AgentInput)input, cancellationToken);
+            // Call base class with typed input
+            var result = await base.ExecuteAsync(input, cancellationToken);
+            return (TOutput)result;
         }
 
         // Override the result conversion for typed output

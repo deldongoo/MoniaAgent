@@ -3,40 +3,41 @@ using MoniaAgent.Core.Inputs;
 using MoniaAgent.Core.Outputs;
 using MoniaAgent.Configuration;
 
-namespace MoniaAgentTest
+namespace MoniaAgentTest.Agents
 {
-    public class FileSystemAgent : TypedAgent<TextInput, TextOutput>
+    public class McpDesktopCommanderAgent : TypedAgent<TextInput, TextOutput>
     {
-        public FileSystemAgent(LLM llm) : base(llm)
+        public McpDesktopCommanderAgent(LLM llm) : base(llm)
         {
         }
 
         protected override AgentConfig Configure() => new()
         {
-            Name = "FileSystemAgent",
-            Specialty = "Secure file operations with configurable access controls",
+            Name = "McpDesktopCommanderAgent",
+            Specialty = "Tools for coding, file access, terminal commands, DevOps, and automation",
             Keywords = new[] { 
                 "read", "write", "edit", "file", "create", "list", "delete", 
-                "directories", "folder", "files", "directory", "move", "search"
+                "directories", "folder", "files", "directory", "move", "search", "code", "execute", "launch", "debug"
             },
             McpServers = new[] {
                 new McpServer
                 {
-                    Name = "filesystem",
+                    Name = "desktop-commander",
                     Command = "npx",
-                    Args = new List<string> { "-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\serva\\source\\repos\\MoniaSandbox" }
+                    Args = new List<string> { "-y", "@wonderwhy-er/desktop-commander" }
                 }
             },
-            Goal = @"You are a filesystem agent with access to file operations. 
+            Goal = @"You are a coding agent with access to file operations. 
                     You can:
                     - List directory contents using available tools
                     - Read and write files
                     - Create and delete directories
                     - Move files and directories
                     - Search for files
-                    - Get file metadata
+                    - Execute commands
+                    - Code programs
 
-                    Use the available filesystem tools to complete user requests. Call task_complete when finished."
+                    Use the available desktop-commander tools to complete user requests. Call task_complete when finished."
         };
 
 

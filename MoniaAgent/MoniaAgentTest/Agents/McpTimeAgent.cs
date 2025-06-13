@@ -3,7 +3,7 @@ using MoniaAgent.Core.Inputs;
 using MoniaAgent.Core.Outputs;
 using MoniaAgent.Configuration;
 
-namespace MoniaAgentTest
+namespace MoniaAgentTest.Agents
 {
     public class McpTimeAgent : TypedAgent<TextInput, TextOutput>
     {

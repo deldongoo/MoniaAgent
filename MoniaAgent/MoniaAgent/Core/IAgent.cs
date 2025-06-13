@@ -9,7 +9,6 @@ namespace MoniaAgent.Core
         string Specialty { get; }
         Type[] SupportedInputTypes { get; }
         Type ExpectedOutputType { get; }
-        Task<string> Execute(string prompt);
         Task<AgentOutput> ExecuteAsync(AgentInput input, CancellationToken cancellationToken = default);
         bool CanHandle(string task);
     }
