@@ -86,6 +86,9 @@ namespace MoniaAgent.Core
             
             this.Goal = goal;
             this.mcpClient = mcpClient;
+            
+            // Initialize connection
+            InitializeConnection();
         }
 
         protected Agent(LLM llm, IMcpClient? mcpClient = null)
@@ -95,6 +98,9 @@ namespace MoniaAgent.Core
             this.tools = new List<AITool>();
             this.Goal = string.Empty; // Will be set by Initialize
             this.mcpClient = mcpClient;
+            
+            // Initialize connection
+            InitializeConnection();
         }
 
         protected void Initialize(IList<AITool> tools, string goal)
@@ -117,10 +123,10 @@ namespace MoniaAgent.Core
             this.Goal = goal;
         }
 
-        public Task ConnectAsync()
+        private void InitializeConnection()
         {
             if (chatClient != null)
-                return Task.CompletedTask; // Déjà connecté
+                return; // Already connected
                 
             if (llm == null)
                 throw new InvalidOperationException("LLM configuration is null");
@@ -143,16 +149,13 @@ namespace MoniaAgent.Core
 
             // Use base client without function invocation to avoid serialization issues
             chatClient = openAIChatClient.AsIChatClient();
-
-
-            return Task.CompletedTask;
         }
 
 
         protected async Task<string> ExecuteInternal(string prompt, ExecutionMetadata executionMetadata)
         {
             if (chatClient == null)
-                await ConnectAsync();
+                throw new InvalidOperationException("Chat client not initialized. This should not happen as connection is initialized in constructor.");
                 
             try
             {
