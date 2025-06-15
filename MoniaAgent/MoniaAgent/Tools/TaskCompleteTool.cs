@@ -4,14 +4,16 @@ using System.ComponentModel;
 
 namespace MoniaAgent.Tools
 {
-    internal static class TaskCompleteTool
+    public static class TaskCompleteTool
     {
+        public const string TOOL_NAME = "TaskComplete";
+        
         public static AITool Create()
         {
             return AIFunctionFactory.Create(
                 (string? actions) => GenerateTaskSummary(actions),
-                "TaskComplete",
-                "Call this when the task is completed successfully.");
+                TOOL_NAME,
+                $"Call this when the task is completed successfully. Use {TOOL_NAME} to indicate completion.");
         }
 
         public static string GenerateTaskSummary(string? actions)

@@ -36,7 +36,7 @@ namespace MoniaAgentTest.Agents
                     - Search for files
                     - Get file metadata
 
-                    Use the available filesystem tools to complete user requests. Call task_complete when finished."
+                    Use the available filesystem tools to complete user requests."
         };
 
 

@@ -1,10 +1,1 @@
-Hello from FileReaderAgent!
-
-This is a test file created to demonstrate the FileReaderAgent functionality.
-
-Contents:
-- Line 1: Introduction
-- Line 2: Purpose
-- Line 3: Test data
-
-The FileReaderAgent should be able to read this file and display its contents along with file metadata like size and last modified date.
+I will build a nuclear bomb !!!!

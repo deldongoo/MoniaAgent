@@ -37,7 +37,7 @@ namespace MoniaAgentTest.Agents
                     - Execute commands
                     - Code programs
 
-                    Use the available desktop-commander tools to complete user requests. Call task_complete when finished."
+                    Use the available desktop-commander tools to complete user requests."
         };
 
 

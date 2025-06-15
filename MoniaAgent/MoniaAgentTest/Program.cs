@@ -6,6 +6,7 @@ using MoniaAgent.Core.Outputs;
 using MoniaAgent.Workflows;
 using MoniaAgentTest.Agents;
 using Microsoft.Extensions.Configuration;
+using System.Linq;
 
 namespace MoniaAgentTest
 {
@@ -13,6 +14,9 @@ namespace MoniaAgentTest
     {
         static async Task Main(string[] args)
         {
+            // Configure UTF-8 encoding for proper emoji display on Windows
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            
             Console.WriteLine("=== MoniaAgent Test Application ===\n");
             
             // Setup configuration
@@ -73,19 +77,7 @@ namespace MoniaAgentTest
 
                 var workflowResult = await workflow.ExecuteAsync("Process the test file");
                 
-                Console.WriteLine($"Workflow Success: {workflowResult.Success}");
-                Console.WriteLine($"Total Duration: {workflowResult.TotalDuration}");
-                Console.WriteLine($"Steps Executed: {workflowResult.StepResults.Count}");
-
-                foreach (var step in workflowResult.StepResults)
-                {
-                    Console.WriteLine($"  {step.StepName} ({step.AgentName}): {step.Success} in {step.Duration}");
-                }
-
-                if (workflowResult.FinalResult != null)
-                {
-                    Console.WriteLine($"Final Result Type: {workflowResult.FinalResult.GetType().Name}");
-                }
+                DisplayWorkflowResult(workflowResult);
             }
             catch (Exception ex)
             {
@@ -151,6 +143,138 @@ namespace MoniaAgentTest
             }
             
             Console.WriteLine();
+        }
+
+        static void DisplayWorkflowResult(WorkflowExecutionResult result)
+        {
+            Console.WriteLine("\n" + new string('=', 70));
+            Console.WriteLine($"WORKFLOW: {result.WorkflowName}");
+            Console.WriteLine($"Status: {(result.Success ? "✅ SUCCESS" : "❌ FAILED")} | Duration: {result.TotalDuration.TotalSeconds:F2}s | Steps: {result.StepResults.Count}");
+            
+            if (!result.Success && !string.IsNullOrEmpty(result.ErrorMessage))
+            {
+                Console.WriteLine($"Error: {result.ErrorMessage}");
+            }
+            Console.WriteLine(new string('=', 70));
+
+            // Display each step
+            for (int i = 0; i < result.StepResults.Count; i++)
+            {
+                var step = result.StepResults[i];
+                
+                Console.WriteLine($"\nSTEP {i + 1}: {step.AgentName}");
+                Console.WriteLine(new string('-', 40));
+                Console.WriteLine($"Status: {(step.Success ? "✅ SUCCESS" : "❌ FAILED")} | Duration: {step.Duration.TotalSeconds:F2}s | Attempts: {step.AttemptNumber}");
+                
+                if (!step.Success && !string.IsNullOrEmpty(step.ErrorMessage))
+                {
+                    Console.WriteLine($"Error: {step.ErrorMessage}");
+                }
+
+                // Display performed actions
+                if (step.Result?.Metadata?.PerformedActions?.Any() == true)
+                {
+                    Console.WriteLine("Actions performed:");
+                    foreach (var action in step.Result.Metadata.PerformedActions)
+                    {
+                        Console.WriteLine($"  • {action.ToolName}");
+                        if (action.Arguments?.Any() == true)
+                        {
+                            var args = string.Join(", ", action.Arguments.Select(kv => 
+                            {
+                                var value = kv.Value?.ToString()?.Replace("\n", " ").Replace("\r", "") ?? "";
+                                return $"{kv.Key}={value}";
+                            }));
+                            Console.WriteLine($"    Args: {args}");
+                        }
+                        if (!string.IsNullOrEmpty(action.Result))
+                        {
+                            var cleanResult = action.Result.Replace("\n", " ").Replace("\r", "");
+                            var result_text = cleanResult.Length > 100 
+                                ? cleanResult.Substring(0, 100) + "..." 
+                                : cleanResult;
+                            Console.WriteLine($"    Result: {result_text}");
+                        }
+                    }
+                }
+
+                // Display step result
+                if (step.Result != null)
+                {
+                    Console.WriteLine("Step result:");
+                    Console.WriteLine($"  Type: {step.Result.GetType().Name}");
+                    
+                    // Generic display using reflection
+                    var properties = step.Result.GetType().GetProperties()
+                        .Where(p => p.CanRead && p.PropertyType.IsPublic && p.Name != "Metadata")
+                        .Take(10); // Limit to first 10 properties
+                    
+                    foreach (var prop in properties)
+                    {
+                        try
+                        {
+                            var value = prop.GetValue(step.Result);
+                            if (value != null)
+                            {
+                                var displayValue = FormatPropertyValue(value);
+                                Console.WriteLine($"  {prop.Name}: {displayValue}");
+                            }
+                        }
+                        catch { /* Skip problematic properties */ }
+                    }
+                }
+            }
+
+            // Display final result
+            Console.WriteLine($"\n" + new string('=', 70));
+            Console.WriteLine("🎯 FINAL WORKFLOW RESULT:");
+            if (result.FinalResult != null)
+            {
+                Console.WriteLine($"Type: {result.FinalResult.GetType().Name}");
+                Console.WriteLine($"Success: {result.FinalResult.Success}");
+                
+                // Show final result content - generic approach
+                var finalProps = result.FinalResult.GetType().GetProperties()
+                    .Where(p => p.CanRead && p.PropertyType.IsPublic && p.Name != "Metadata");
+                
+                foreach (var prop in finalProps)
+                {
+                    try
+                    {
+                        var value = prop.GetValue(result.FinalResult);
+                        if (value != null)
+                        {
+                            var displayValue = FormatPropertyValue(value);
+                            Console.WriteLine($"{prop.Name}: {displayValue}");
+                        }
+                    }
+                    catch { /* Skip problematic properties */ }
+                }
+            }
+            else
+            {
+                Console.WriteLine("No final result available");
+            }
+            Console.WriteLine(new string('=', 70));
+        }
+
+        static string FormatPropertyValue(object value)
+        {
+            if (value == null) return "null";
+            
+            var stringValue = value.ToString();
+            if (string.IsNullOrEmpty(stringValue)) return "";
+            
+            // Clean line breaks for consistent display
+            var cleanValue = stringValue.Replace("\n", " ").Replace("\r", "");
+            
+            // Truncate long values
+            if (cleanValue.Length > 300)
+            {
+                return cleanValue.Substring(0, 300) + "...";
+            }
+            
+            return cleanValue;
         }
     }
 }

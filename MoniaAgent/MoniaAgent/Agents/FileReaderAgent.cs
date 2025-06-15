@@ -2,7 +2,9 @@ using MoniaAgent.Configuration;
 using MoniaAgent.Core;
 using MoniaAgent.Core.Inputs;
 using MoniaAgent.Core.Outputs;
+using MoniaAgent.Tools;
 using System.ComponentModel;
+using System.Text.Json;
 
 namespace MoniaAgent.Agents
 {
@@ -18,9 +20,8 @@ namespace MoniaAgent.Agents
             Specialty = "Reading files and extracting content",
             Keywords = new[] { "read", "file", "content", "open", "show", "display" },
             ToolMethods = new Delegate[] { ReadFileContent },
-            Goal = @"You are a file reading specialist. You can read files and extract their content.
-                    Use the read_file_content tool to read files when requested.
-                    Always call task_complete when finished reading the file."
+            Goal = $@"You are a file reading specialist. You can read files and extract their content.
+                    Use the read_file_content tool to read files when requested."
         };
 
         [Description("Reads the content of a file. Parameters: filePath (string: path to the file to read)")]
@@ -30,17 +31,22 @@ namespace MoniaAgent.Agents
             {
                 if (!File.Exists(filePath))
                 {
-                    return $"Error: File not found at path: {filePath}";
+                    return "ERROR: File not found";
                 }
 
                 var content = File.ReadAllText(filePath);
                 var fileInfo = new FileInfo(filePath);
                 
-                return $"File: {filePath}\nSize: {fileInfo.Length} bytes\nLast Modified: {fileInfo.LastWriteTime}\n\nContent:\n{content}";
+                return JsonSerializer.Serialize(new {
+                    filePath,
+                    content,
+                    size = fileInfo.Length,
+                    lastModified = fileInfo.LastWriteTime
+                });
             }
             catch (Exception ex)
             {
-                return $"Error reading file: {ex.Message}";
+                return $"ERROR: {ex.Message}";
             }
         }
 
@@ -63,77 +69,46 @@ namespace MoniaAgent.Agents
                 Metadata = metadata
             };
 
-            // Parse the action summary format
-            if (textResult.StartsWith("Actions performed:"))
+            // Handle direct error responses
+            if (textResult.StartsWith("ERROR:"))
             {
-                // Extract ReadFileContent action result
-                var readFileContentMatch = System.Text.RegularExpressions.Regex.Match(
+                result.Success = false;
+                result.ErrorMessage = textResult;
+                return result;
+            }
+
+            // Look for JSON in action summary format
+            if (textResult.Contains("ReadFileContent"))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(
                     textResult, 
-                    @"ReadFileContent\([^)]+\) --> (.+?)(?=- TaskComplete|\z)", 
+                    @"ReadFileContent\([^)]+\) --> ({.*?})(?=\s*-|\z)", 
                     System.Text.RegularExpressions.RegexOptions.Singleline);
-
-                if (readFileContentMatch.Success)
-                {
-                    var fileContentResult = readFileContentMatch.Groups[1].Value.Trim();
-                    
-                    // Parse file metadata
-                    var lines = fileContentResult.Split('\n');
-                    
-                    // Extract file path
-                    var filePathLine = lines.FirstOrDefault(l => l.StartsWith("File: "));
-                    if (filePathLine != null)
-                    {
-                        result.FilePath = filePathLine.Substring(6).Trim();
-                    }
-
-                    // Extract file size
-                    var sizeLine = lines.FirstOrDefault(l => l.StartsWith("Size: "));
-                    if (sizeLine != null)
-                    {
-                        var sizeMatch = System.Text.RegularExpressions.Regex.Match(sizeLine, @"Size: (\d+)");
-                        if (sizeMatch.Success && long.TryParse(sizeMatch.Groups[1].Value, out var size))
-                        {
-                            result.FileSize = size;
-                        }
-                    }
-
-                    // Extract last modified date
-                    var modifiedLine = lines.FirstOrDefault(l => l.StartsWith("Last Modified: "));
-                    if (modifiedLine != null && DateTime.TryParse(modifiedLine.Substring(15).Trim(), out var lastModified))
-                    {
-                        result.LastModified = lastModified;
-                    }
-
-                    // Extract actual file content
-                    var contentIndex = Array.FindIndex(lines, l => l.StartsWith("Content:"));
-                    if (contentIndex >= 0 && contentIndex < lines.Length - 1)
-                    {
-                        var contentLines = lines.Skip(contentIndex + 1).ToArray();
-                        result.Content = string.Join("\n", contentLines).Trim();
-                    }
-
-                    // Success if we have valid file data
-                    result.Success = !string.IsNullOrEmpty(result.FilePath) && !string.IsNullOrEmpty(result.Content);
-                }
-                else
-                {
-                    result.Success = false;
-                    result.ErrorMessage = "Could not parse file reading result from action summary";
-                    result.Content = textResult;
-                }
-            }
-            else
-            {
-                // Fallback to original logic for backward compatibility
-                result.Success = !textResult.Contains("Error");
-                result.Content = textResult;
                 
-                if (!result.Success)
+                if (match.Success)
                 {
-                    result.ErrorMessage = textResult.Contains("Error") ? textResult : "Unknown error occurred";
+                    var jsonResult = match.Groups[1].Value.Trim();
+                    try
+                    {
+                        var data = JsonSerializer.Deserialize<JsonElement>(jsonResult);
+                        result.FilePath = data.GetProperty("filePath").GetString();
+                        result.Content = data.GetProperty("content").GetString();
+                        result.FileSize = data.GetProperty("size").GetInt64();
+                        result.LastModified = data.GetProperty("lastModified").GetDateTime();
+                        result.Success = true;
+                        return result;
+                    }
+                    catch
+                    {
+                        // Fall through to error handling
+                    }
                 }
             }
 
+            // Fallback: couldn't parse
+            result.Success = false;
+            result.ErrorMessage = "Could not parse tool result";
+            result.Content = textResult;
             return result;
         }
     }

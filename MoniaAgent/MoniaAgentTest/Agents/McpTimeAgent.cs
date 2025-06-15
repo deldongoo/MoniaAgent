@@ -34,7 +34,7 @@ namespace MoniaAgentTest.Agents
                     - Handle timezone conversions
                     - Answer time-related queries in French or English
 
-                    Use the available time tools to complete user requests. Call task_complete when finished."
+                    Use the available time tools to complete user requests."
         };
 
 

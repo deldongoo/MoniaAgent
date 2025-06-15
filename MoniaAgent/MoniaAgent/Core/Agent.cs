@@ -84,7 +84,7 @@ namespace MoniaAgent.Core
             // Add built-in framework tools
             this.tools.Add(TaskCompleteTool.Create());
             
-            this.Goal = goal;
+            this.Goal = goal + $"\n\nIMPORTANT: Always call the {Tools.TaskCompleteTool.TOOL_NAME} tool when you have finished your work to indicate completion.";
             this.mcpClient = mcpClient;
             
             // Initialize connection
@@ -120,7 +120,7 @@ namespace MoniaAgent.Core
             // Add built-in framework tools
             this.tools.Add(TaskCompleteTool.Create());
             
-            this.Goal = goal;
+            this.Goal = goal + $"\n\nIMPORTANT: Always call the {Tools.TaskCompleteTool.TOOL_NAME} tool when you have finished your work to indicate completion.";
         }
 
         private void InitializeConnection()
@@ -219,7 +219,7 @@ namespace MoniaAgent.Core
                             Console.WriteLine($"[TOOLCALL] {actionDescription}");
                             
                             // If task_complete was called, return its result immediately
-                            if (toolCall.Name == "TaskComplete")
+                            if (toolCall.Name == TaskCompleteTool.TOOL_NAME)
                             {
                                 var actionSummaries = executionMetadata.PerformedActions.Select(FormatActionForDisplay);
                                 var finalSummary = string.IsNullOrEmpty(lastTextResponse)
