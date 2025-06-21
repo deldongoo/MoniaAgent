@@ -25,19 +25,29 @@ namespace MoniaAgentTest.Agents
             Specialty = "Analyzes content for security risks and dangerous patterns",
             Keywords = new[] { "safety", "security", "malware", "dangerous", "risk", "threat" },
             ToolMethods = new Delegate[0],
+            UseStructuredOutput = true, // Enable structured output
             Goal = @"You are a content safety expert. Analyze the provided content for:
                     1. Security threats (malware patterns, suspicious scripts, executable code)
                     2. Dangerous content (instructions for harmful activities)
                     3. Sensitive data exposure (passwords, API keys, personal info)
-                    4. Malicious patterns (phishing attempts, social engineering)
-
-                    Respond with a JSON object containing:
-                    {
-                      ""isSafe"": true/false,
-                      ""riskLevel"": ""Low|Medium|High|Critical"",
-                      ""summary"": ""Brief explanation""
-                    }"
+                    4. Malicious patterns (phishing attempts, social enginering)"
         };
+
+        protected override string ConvertInputToPrompt(AgentInput input)
+        {
+            if (input is TextInput textInput)
+            {
+                return $@"Analyze this content for safety: {textInput.Prompt}
+
+                Respond with ONLY a JSON object in this exact format:
+                {{
+                  ""isSafe"": true/false,
+                  ""riskLevel"": ""Low|Medium|High|Critical"",
+                  ""summary"": ""Brief explanation""
+                }}";
+            }
+            return base.ConvertInputToPrompt(input);
+        }
 
         protected override ContentSafetyOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
         {
@@ -51,28 +61,28 @@ namespace MoniaAgentTest.Agents
 
             try
             {
-                var jsonStart = textResult.IndexOf('{');
-                var jsonEnd = textResult.LastIndexOf('}') + 1;
+                // For agents without tools, the JSON response is in the first LLM response from conversation history
+                var firstLlmResponse = metadata.ConversationHistory?
+                    .FirstOrDefault(step => step.Type == ConversationStepType.LlmResponse);
 
-                if (jsonStart >= 0 && jsonEnd > jsonStart)
+                string jsonContent = firstLlmResponse?.Content ?? textResult;
+
+                // With UseStructuredOutput=true, the LLM response should be pure JSON
+                var options = new JsonSerializerOptions
                 {
-                    var jsonString = textResult.Substring(jsonStart, jsonEnd - jsonStart);
-                    var json = JsonSerializer.Deserialize<JsonElement>(jsonString);
-
-                    if (json.TryGetProperty("isSafe", out var isSafe))
-                        output.IsSafe = isSafe.GetBoolean();
-
-                    if (json.TryGetProperty("riskLevel", out var riskLevel))
-                        output.RiskLevel = riskLevel.GetString() ?? "Low";
-
-                    if (json.TryGetProperty("summary", out var summary))
-                        output.Summary = summary.GetString() ?? textResult;
+                    PropertyNameCaseInsensitive = true
+                };
+                var parsed = JsonSerializer.Deserialize<ContentSafetyOutput>(jsonContent, options);
+                
+                if (parsed != null)
+                {
+                    output.IsSafe = parsed.IsSafe;
+                    output.RiskLevel = parsed.RiskLevel;
+                    output.Summary = parsed.Summary;
                 }
             }
             catch
-            {
-                // Parsing failed, keep defaults (unsafe state)
-            }
+            {}
 
             return output;
         }

@@ -3,10 +3,17 @@ using MoniaAgent.Core.Inputs;
 using MoniaAgent.Core.Outputs;
 using MoniaAgent.Configuration;
 using System.ComponentModel;
+using System.Text.Json;
 
 namespace MoniaAgentTest.Agents
 {
-    public class TimeAgent : TypedAgent<TextInput, TextOutput>
+    public class TimeOutput : TextOutput
+    {
+        public DateTime CurrentTime { get; set; }
+        public string FormattedTime { get; set; } = string.Empty;
+    }
+
+    public class TimeAgent : TypedAgent<TextInput, TimeOutput>
     {
         public TimeAgent(LLM llm) : base(llm)
         {
@@ -21,21 +28,43 @@ namespace MoniaAgentTest.Agents
             Goal = "You are a time specialist AI assistant. You help users with time-related queries, timezone conversions, and scheduling. Always use the get_current_time tool when users ask about current time."
         };
 
-        [Description("Gets the current date and time. Parameters: timezone (optional: 'utc', 'local', or timezone ID), format (optional: .NET datetime format string)")]
-        private static string GetCurrentTime()
+        [Description("Return the current time in the system timezone")]
+        private static TimeOutput GetCurrentTime()
         {
-            DateTime dateTime = DateTime.Now;
-            return dateTime.ToString("yyyy-MM-dd HH:mm:ss zzz");
+            var now = DateTime.Now;
+            return new TimeOutput
+            {
+                CurrentTime = now,
+                FormattedTime = now.ToString("yyyy-MM-dd HH:mm:ss zzz"),
+                Success = true
+            };
         }
 
 
         // Implement abstract method for string to output conversion
-        protected override TextOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
+        protected override TimeOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
         {
-            return new TextOutput
+            var toolResult = metadata.FindToolResult("GetCurrentTime");
+            if (!string.IsNullOrEmpty(toolResult))
             {
-                Success = !textResult.Contains("Error") && !textResult.Contains("Failed"),
+                var options = new JsonSerializerOptions 
+                { 
+                    PropertyNameCaseInsensitive = true 
+                };
+                var result = JsonSerializer.Deserialize<TimeOutput>(toolResult, options);
+                if (result != null)
+                {
+                    result.Metadata = metadata;
+                    result.Content = textResult;
+                    return result;
+                }
+            }
+
+            return new TimeOutput
+            {
+                Success = false,
                 Content = textResult,
+                ErrorMessage = "No time result found",
                 Metadata = metadata
             };
         }

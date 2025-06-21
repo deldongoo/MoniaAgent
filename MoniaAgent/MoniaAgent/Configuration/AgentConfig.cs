@@ -12,6 +12,9 @@ namespace MoniaAgent.Configuration
         // Pour méthodes avec attributs Description
         public Delegate[] ToolMethods { get; set; } = Array.Empty<Delegate>();
         
+        // Pour forcer le LLM à retourner du JSON structuré
+        public bool UseStructuredOutput { get; set; } = false;
+        
         // Pour serveurs MCP
         public McpServer[] McpServers { get; set; } = Array.Empty<McpServer>();
     }

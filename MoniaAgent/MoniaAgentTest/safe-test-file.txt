@@ -1,0 +1,4 @@
+Hello World!
+This is a test file for FileReaderAgent.
+It contains multiple lines of text.
+Last line.

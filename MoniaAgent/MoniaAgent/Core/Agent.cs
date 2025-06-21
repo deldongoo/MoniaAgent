@@ -45,17 +45,15 @@ namespace MoniaAgent.Core
             sb.AppendLine("=========================");
 
             string log = sb.ToString();
-            Console.WriteLine(log);
-            System.Diagnostics.Debug.WriteLine(log); // pour Visual Studio "Sortie" > "Debug"
+            var logger = MoniaLogging.CreateLogger("HttpRequest");
+            logger.LogDebug("{HttpRequestLog}", log);
             return await base.SendAsync(request, cancellationToken);
         }
     }
 
     public class Agent : IAgent
     {
-        private static readonly ILoggerFactory loggerFactory = LoggerFactory.Create(builder => 
-            builder.AddConsole().SetMinimumLevel(LogLevel.Information));
-        private static readonly ILogger logger = loggerFactory.CreateLogger<Agent>();
+        private readonly ILogger logger;
         
         protected readonly LLM? llm;
         protected readonly IList<AITool> tools;
@@ -71,25 +69,6 @@ namespace MoniaAgent.Core
         public virtual Type ExpectedOutputType => typeof(AgentOutput);
         public virtual bool CanHandle(string task) => true;
 
-        protected Agent(LLM llm, IList<AITool> tools, string goal, IMcpClient? mcpClient = null)
-        {
-            llm?.Validate();
-            
-            if (string.IsNullOrWhiteSpace(goal))
-                throw new ArgumentException("Goal cannot be null or empty", nameof(goal));
-                
-            this.llm = llm;
-            this.tools = new List<AITool>(tools ?? new List<AITool>());
-            
-            // Add built-in framework tools
-            this.tools.Add(TaskCompleteTool.Create());
-            
-            this.Goal = goal + $"\n\nIMPORTANT: Always call the {Tools.TaskCompleteTool.TOOL_NAME} tool when you have finished your work to indicate completion.";
-            this.mcpClient = mcpClient;
-            
-            // Initialize connection
-            InitializeConnection();
-        }
 
         protected Agent(LLM llm, IMcpClient? mcpClient = null)
         {
@@ -98,16 +77,26 @@ namespace MoniaAgent.Core
             this.tools = new List<AITool>();
             this.Goal = string.Empty; // Will be set by Initialize
             this.mcpClient = mcpClient;
+            this.logger = MoniaLogging.CreateLogger<Agent>();
             
             // Initialize connection
             InitializeConnection();
         }
 
+        protected AgentConfig? agentConfig;
+
         protected void Initialize(IList<AITool> tools, string goal)
         {
-            if (string.IsNullOrWhiteSpace(goal))
-                throw new ArgumentException("Goal cannot be null or empty", nameof(goal));
+            var config = new AgentConfig { Goal = goal };
+            Initialize(tools, config);
+        }
 
+        protected void Initialize(IList<AITool> tools, AgentConfig config)
+        {
+            if (string.IsNullOrWhiteSpace(config.Goal))
+                throw new ArgumentException("Goal cannot be null or empty", nameof(config.Goal));
+
+            this.agentConfig = config;
             this.tools.Clear();
             if (tools != null)
             {
@@ -120,7 +109,7 @@ namespace MoniaAgent.Core
             // Add built-in framework tools
             this.tools.Add(TaskCompleteTool.Create());
             
-            this.Goal = goal + $"\n\nIMPORTANT: Always call the {Tools.TaskCompleteTool.TOOL_NAME} tool when you have finished your work to indicate completion.";
+            this.Goal = config.Goal + $"\n\nIMPORTANT: Always call the {Tools.TaskCompleteTool.TOOL_NAME} tool when you have finished your work to indicate completion.";
         }
 
         private void InitializeConnection()
@@ -170,6 +159,20 @@ namespace MoniaAgent.Core
                     Tools = tools,
                 };
 
+                // Add structured output if requested
+                if (agentConfig?.UseStructuredOutput == true)
+                {
+                    try
+                    {
+                        requestOptions.ResponseFormat = ChatResponseFormat.Json;
+                        logger.LogDebug("Structured output enabled for agent {AgentName}", agentConfig.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning("Failed to enable structured output: {Error}. Falling back to normal mode.", ex.Message);
+                    }
+                }
+
                 const int maxTurns = 10;
                 int consecutiveNonToolMessages = 0;
                 string lastTextResponse = "";
@@ -184,13 +187,21 @@ namespace MoniaAgent.Core
                         // Add all response messages
                         messages.AddRange(completion.Messages);
                         
-                        // Log any text content that accompanies tool calls
+                        // Log and record any text content that accompanies tool calls
                         foreach (var message in completion.Messages)
                         {
                             var textContent = message.Contents.OfType<TextContent>().FirstOrDefault()?.Text;
                             if (!string.IsNullOrEmpty(textContent))
                             {
-                                Console.WriteLine($"[TEXT] {textContent}");
+                                logger.LogInformation("[TEXT] {TextContent}", textContent);
+                                
+                                // Record LLM response in conversation history
+                                executionMetadata.ConversationHistory.Add(new ConversationStep
+                                {
+                                    Type = ConversationStepType.LlmResponse,
+                                    Timestamp = DateTime.UtcNow,
+                                    Content = textContent
+                                });
                             }
                         }
                         
@@ -201,31 +212,38 @@ namespace MoniaAgent.Core
                         
                         foreach (var toolCall in toolCalls)
                         {
+                            // Record tool call in conversation history
+                            var argumentsDict = toolCall.Arguments?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? new();
+                            executionMetadata.ConversationHistory.Add(new ConversationStep
+                            {
+                                Type = ConversationStepType.ToolCall,
+                                Timestamp = DateTime.UtcNow,
+                                Content = $"Calling {toolCall.Name}",
+                                ToolName = toolCall.Name,
+                                Arguments = argumentsDict
+                            });
+                            
                             // Execute tool manually
                             var toolResult = await ExecuteToolManually(toolCall);
-
-                            // Track action in metadata
-                            var performedAction = new PerformedAction
+                            
+                            // Record tool result in conversation history
+                            executionMetadata.ConversationHistory.Add(new ConversationStep
                             {
+                                Type = ConversationStepType.ToolResult,
+                                Timestamp = DateTime.UtcNow,
+                                Content = $"Result from {toolCall.Name}",
                                 ToolName = toolCall.Name,
-                                Arguments = toolCall.Arguments?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? new(),
-                                Result = FormatActionOutput(toolResult),
-                                Timestamp = DateTime.UtcNow
-                            };
-                            executionMetadata.PerformedActions.Add(performedAction);
-                            
+                                Result = FormatActionOutput(toolResult)
+                            });
+
                             // Real-time display
-                            var actionDescription = FormatActionForDisplay(performedAction);
-                            Console.WriteLine($"[TOOLCALL] {actionDescription}");
+                            var argsString = string.Join(", ", argumentsDict.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+                            logger.LogInformation("[TOOLCALL] {ToolName}({Arguments}) --> {Result}", toolCall.Name, argsString, FormatActionOutput(toolResult));
                             
-                            // If task_complete was called, return its result immediately
+                            // If task_complete was called, return its finalAnswer immediately
                             if (toolCall.Name == TaskCompleteTool.TOOL_NAME)
                             {
-                                var actionSummaries = executionMetadata.PerformedActions.Select(FormatActionForDisplay);
-                                var finalSummary = string.IsNullOrEmpty(lastTextResponse)
-                                    ? $"Actions performed:\n{string.Join("\n", actionSummaries)}"
-                                    : $"{lastTextResponse}\n\nActions performed:\n{string.Join("\n", actionSummaries)}";
-                                return finalSummary;
+                                return toolResult ?? "Task completed";
                             }
                             
                             // Add tool result as message
@@ -241,10 +259,18 @@ namespace MoniaAgent.Core
                         var lastMessage = completion.Messages.LastOrDefault();
                         lastTextResponse = lastMessage?.Text ?? "";
                         
-                        // Log text responses
+                        // Log and record text responses
                         if (!string.IsNullOrEmpty(lastTextResponse))
                         {
-                            Console.WriteLine($"[TEXT] {lastTextResponse}");
+                            logger.LogInformation("[TEXT] {TextContent}", lastTextResponse);
+                            
+                            // Record LLM response in conversation history
+                            executionMetadata.ConversationHistory.Add(new ConversationStep
+                            {
+                                Type = ConversationStepType.LlmResponse,
+                                Timestamp = DateTime.UtcNow,
+                                Content = lastTextResponse
+                            });
                         }
                         
                         if (lastMessage != null)
@@ -259,16 +285,6 @@ namespace MoniaAgent.Core
                     }
                 }
 
-                // Return summary if actions were performed, otherwise last text response
-                if (executionMetadata.PerformedActions.Count > 0)
-                {
-                    var actionSummaries = executionMetadata.PerformedActions.Select(FormatActionForDisplay);
-                    var finalSummary = string.IsNullOrEmpty(lastTextResponse) 
-                        ? $"Actions performed:\n{string.Join("\n", actionSummaries)}"
-                        : $"{lastTextResponse}\n\nActions performed:\n{string.Join("\n", actionSummaries)}";
-                    return finalSummary;
-                }
-                
                 return lastTextResponse;
             }
             catch (Exception ex)
@@ -448,13 +464,6 @@ namespace MoniaAgent.Core
             return toolResult;
         }
 
-        private static string FormatActionForDisplay(PerformedAction action)
-        {
-            var argsString = action.Arguments.Count > 0
-                ? $"({string.Join(", ", action.Arguments.Select(kvp => $"{kvp.Key}={kvp.Value}"))})"
-                : "";
-            return $"- {action.ToolName}{argsString} --> {action.Result}";
-        }
 
     }
 }

@@ -20,7 +20,7 @@ namespace MoniaAgent.Core
         {
             config = Configure();
             var tools = BuildTools(config);
-            Initialize(tools, config.Goal);
+            Initialize(tools, config);
         }
 
         protected virtual AgentConfig Configure()

@@ -4,13 +4,25 @@ using System.Collections.Generic;
 namespace MoniaAgent.Core.Outputs
 {
     /// <summary>
-    /// Represents a tool action that was performed during agent execution
+    /// Represents a step in the conversation history (LLM response, tool call, or tool result)
     /// </summary>
-    public class PerformedAction
+    public class ConversationStep
     {
-        public string ToolName { get; set; } = string.Empty;
-        public Dictionary<string, object?> Arguments { get; set; } = new();
-        public string Result { get; set; } = string.Empty;
+        public ConversationStepType Type { get; set; }
         public DateTime Timestamp { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public string? ToolName { get; set; }
+        public Dictionary<string, object?>? Arguments { get; set; }
+        public string? Result { get; set; }
+    }
+
+    /// <summary>
+    /// Types of conversation steps
+    /// </summary>
+    public enum ConversationStepType
+    {
+        LlmResponse,
+        ToolCall,
+        ToolResult
     }
 }

@@ -5,15 +5,19 @@ using ModelContextProtocol.Protocol;
 using System.Collections.Generic;
 using System.Text.Json;
 using MoniaAgent.Configuration;
+using MoniaAgent.Core;
 
 namespace MoniaAgent.Tools
 {
     internal class ToolRegistry
     {
-        private static readonly ILoggerFactory loggerFactory = LoggerFactory.Create(builder => 
-        builder.AddConsole().SetMinimumLevel(LogLevel.Information));
-        private static readonly ILogger logger = loggerFactory.CreateLogger<ToolRegistry>();
+        private readonly ILogger logger;
         private readonly List<AITool> tools = new List<AITool>();
+
+        public ToolRegistry()
+        {
+            logger = MoniaLogging.CreateLogger<ToolRegistry>();
+        }
 
         public void RegisterTool(AITool tool)
         {

@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+using ModelContextProtocol.Protocol;
 using MoniaAgent.Agents;
 using MoniaAgent.Configuration;
 using MoniaAgent.Core;
@@ -5,7 +7,6 @@ using MoniaAgent.Core.Inputs;
 using MoniaAgent.Core.Outputs;
 using MoniaAgent.Workflows;
 using MoniaAgentTest.Agents;
-using Microsoft.Extensions.Configuration;
 using System.Linq;
 
 namespace MoniaAgentTest
@@ -17,16 +18,41 @@ namespace MoniaAgentTest
             // Configure UTF-8 encoding for proper emoji display on Windows
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             
+            // Configure centralized logging
+            SetupLogging(args);
+            
             Console.WriteLine("=== MoniaAgent Test Application ===\n");
             
             // Setup configuration
             var llm = SetupConfiguration();
-            
+
             // Run tests
-            await TestWorkflowSystem(llm);
-           // await TestMcpDesktopCommander(llm);
-            
+            //await TestWorkflowSystem(llm);
+            await TestMcpDesktopCommander(llm);
+            //await TestTimeAgent(llm);
+            //await TestFileReaderAgent(llm);
+
             Console.WriteLine("\n=== All tests completed ===");
+        }
+
+        static void SetupLogging(string[] args)
+        {
+            // Determine log level from command line args
+            var logLevel = Microsoft.Extensions.Logging.LogLevel.Information; // Default
+            
+            if (args.Contains("--verbose") || args.Contains("-v"))
+                logLevel = Microsoft.Extensions.Logging.LogLevel.Debug;
+            else if (args.Contains("--quiet") || args.Contains("-q"))
+                logLevel = Microsoft.Extensions.Logging.LogLevel.Warning;
+            else if (args.Contains("--silent"))
+                logLevel = Microsoft.Extensions.Logging.LogLevel.Error;
+
+            logLevel = Microsoft.Extensions.Logging.LogLevel.Error;
+            // Configure MoniaLogging using the built-in helper
+            MoniaLogging.ConfigureDefault(logLevel);
+            
+            var logger = MoniaLogging.CreateLogger<Program>();
+            Console.WriteLine($"Logging configured with level: {logLevel}");
         }
 
         static LLM SetupConfiguration()
@@ -94,24 +120,52 @@ namespace MoniaAgentTest
             try
             {
                 var desktopCommanderAgent = new McpDesktopCommanderAgent(llm);
-                var desktopCommanderResponse = await desktopCommanderAgent.ExecuteAsync(
-                    "Draw a butterfly in svg. Write the code into a html file in C:\\Users\\serva\\source\\repos\\MoniaSandbox. Launch it in a web browser.");
-                
-                Console.WriteLine($"Success: {desktopCommanderResponse.Success}");
-                if (desktopCommanderResponse.Success)
-                {
-                    Console.WriteLine($"Result: Operation completed successfully");
-                }
-                else
-                {
-                    Console.WriteLine($"Error: {desktopCommanderResponse.ErrorMessage}");
-                }
+
+                var workflow = new WorkflowBuilder()
+                    .WithName("FileProcessingWorkflow")
+                    .RegisterAgent(desktopCommanderAgent)
+                    .AddStep("McpDesktopCommanderAgent", config =>
+                    {
+                        config.InputTransformer = _ => new TextInput("Draw a butterfly in svg.Write the code into a html file in C:\\Users\\serva\\source\\repos\\MoniaSandbox.Launch it in a web browser.");
+                    })
+                    .Build();
+
+                var workflowResult = await workflow.ExecuteAsync("Load SVG butterfly in the browser");
+                DisplayWorkflowResult(workflowResult);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Desktop commander test failed: {ex.Message}");
             }
             
+            Console.WriteLine();
+        }
+
+        static async Task TestTimeAgent(LLM llm)
+        {
+            Console.WriteLine("=== Testing Time Agent===");
+
+            try
+            {
+                var timeAgent = new TimeAgent(llm);
+                var timeAgentResponse = await timeAgent.ExecuteAsync("What local time is it?");
+
+                Console.WriteLine($"Success: {timeAgentResponse.Success}");
+                if (timeAgentResponse.Success && timeAgentResponse is TimeOutput timeOutput)
+                {
+                    Console.WriteLine($"Time: {timeOutput.CurrentTime}");
+                    Console.WriteLine($"Text: {timeOutput.Content}");
+                }
+                else
+                {
+                    Console.WriteLine($"Error: {timeAgentResponse.ErrorMessage}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Time Agent test failed: {ex.Message}");
+            }
+
             Console.WriteLine();
         }
 
@@ -123,7 +177,7 @@ namespace MoniaAgentTest
             {
                 var fileReaderAgent = new FileReaderAgent(llm);
                 var fileResult = await fileReaderAgent.ExecuteAsync(new FileInput("test-file.txt"));
-                
+                Console.WriteLine("=== Results FileReaderAgent ===");
                 Console.WriteLine($"File read success: {fileResult.Success}");
                 if (fileResult.Success && fileResult is FileOutput fileOutput)
                 {
@@ -171,29 +225,33 @@ namespace MoniaAgentTest
                     Console.WriteLine($"Error: {step.ErrorMessage}");
                 }
 
-                // Display performed actions
-                if (step.Result?.Metadata?.PerformedActions?.Any() == true)
+                // Display conversation history
+                if (step.Result?.Metadata?.ConversationHistory?.Any() == true)
                 {
-                    Console.WriteLine("Actions performed:");
-                    foreach (var action in step.Result.Metadata.PerformedActions)
+                    Console.WriteLine("Conversation history:");
+                    foreach (var historyStep in step.Result.Metadata.ConversationHistory)
                     {
-                        Console.WriteLine($"  • {action.ToolName}");
-                        if (action.Arguments?.Any() == true)
+                        var timestamp = historyStep.Timestamp.ToString("HH:mm:ss");
+                        switch (historyStep.Type)
                         {
-                            var args = string.Join(", ", action.Arguments.Select(kv => 
-                            {
-                                var value = kv.Value?.ToString()?.Replace("\n", " ").Replace("\r", "") ?? "";
-                                return $"{kv.Key}={value}";
-                            }));
-                            Console.WriteLine($"    Args: {args}");
-                        }
-                        if (!string.IsNullOrEmpty(action.Result))
-                        {
-                            var cleanResult = action.Result.Replace("\n", " ").Replace("\r", "");
-                            var result_text = cleanResult.Length > 100 
-                                ? cleanResult.Substring(0, 100) + "..." 
-                                : cleanResult;
-                            Console.WriteLine($"    Result: {result_text}");
+                            case ConversationStepType.LlmResponse:
+                                var responseText = historyStep.Content.Length > 100 
+                                    ? historyStep.Content.Substring(0, 100) + "..." 
+                                    : historyStep.Content;
+                                Console.WriteLine($"  [{timestamp}] LLM: {responseText}");
+                                break;
+                            case ConversationStepType.ToolCall:
+                                var args = historyStep.Arguments?.Any() == true 
+                                    ? $"({string.Join(", ", historyStep.Arguments.Select(kv => $"{kv.Key}={kv.Value}"))})" 
+                                    : "";
+                                Console.WriteLine($"  [{timestamp}] TOOL CALL: {historyStep.ToolName}{args}");
+                                break;
+                            case ConversationStepType.ToolResult:
+                                var resultText = historyStep.Result?.Length > 100 
+                                    ? historyStep.Result.Substring(0, 100) + "..." 
+                                    : historyStep.Result ?? "";
+                                Console.WriteLine($"  [{timestamp}] TOOL RESULT: {historyStep.ToolName} -> {resultText}");
+                                break;
                         }
                     }
                 }

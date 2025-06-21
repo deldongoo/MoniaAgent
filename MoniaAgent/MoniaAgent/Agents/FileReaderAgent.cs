@@ -5,6 +5,7 @@ using MoniaAgent.Core.Outputs;
 using MoniaAgent.Tools;
 using System.ComponentModel;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MoniaAgent.Agents
 {
@@ -25,37 +26,52 @@ namespace MoniaAgent.Agents
         };
 
         [Description("Reads the content of a file. Parameters: filePath (string: path to the file to read)")]
-        private static string ReadFileContent(string filePath)
+        private static FileOutput ReadFileContent(string filePath)
         {
             try
             {
                 if (!File.Exists(filePath))
                 {
-                    return "ERROR: File not found";
+                    return new FileOutput
+                    {
+                        FilePath = filePath,
+                        Success = false,
+                        ErrorMessage = "File not found",
+                        Operation = FileOperation.Read
+                    };
                 }
 
                 var content = File.ReadAllText(filePath);
                 var fileInfo = new FileInfo(filePath);
                 
-                return JsonSerializer.Serialize(new {
-                    filePath,
-                    content,
-                    size = fileInfo.Length,
-                    lastModified = fileInfo.LastWriteTime
-                });
+                return new FileOutput
+                {
+                    FilePath = filePath,
+                    Content = content,
+                    FileSize = fileInfo.Length,
+                    LastModified = fileInfo.LastWriteTime,
+                    Operation = FileOperation.Read,
+                    Success = true
+                };
             }
             catch (Exception ex)
             {
-                return $"ERROR: {ex.Message}";
+                return new FileOutput
+                {
+                    FilePath = filePath,
+                    Success = false,
+                    ErrorMessage = ex.Message,
+                    Operation = FileOperation.Read
+                };
             }
         }
 
-        // Override input conversion to handle FileInput
+        // Override input conversion to handle FileInput with simplified prompt
         protected override string ConvertInputToPrompt(AgentInput input)
         {
             if (input is FileInput fileInput)
             {
-                return $"Read the file at {fileInput.FilePath} and return its contents. Use the read_file_content tool with the file path.";
+                return $"Read the file: {fileInput.FilePath}";
             }
             return base.ConvertInputToPrompt(input);
         }
@@ -69,45 +85,37 @@ namespace MoniaAgent.Agents
                 Metadata = metadata
             };
 
-            // Handle direct error responses
-            if (textResult.StartsWith("ERROR:"))
+            // Use the new helper method to find ReadFileContent tool result
+            var toolResult = metadata.FindToolResult("ReadFileContent");
+            if (!string.IsNullOrEmpty(toolResult))
             {
-                result.Success = false;
-                result.ErrorMessage = textResult;
-                return result;
-            }
-
-            // Look for JSON in action summary format
-            if (textResult.Contains("ReadFileContent"))
-            {
-                var match = System.Text.RegularExpressions.Regex.Match(
-                    textResult, 
-                    @"ReadFileContent\([^)]+\) --> ({.*?})(?=\s*-|\z)", 
-                    System.Text.RegularExpressions.RegexOptions.Singleline);
-                
-                if (match.Success)
+                try
                 {
-                    var jsonResult = match.Groups[1].Value.Trim();
-                    try
+                    // Deserialize directly to FileOutput with case-insensitive options and enum converter
+                    var options = new JsonSerializerOptions 
+                    { 
+                        PropertyNameCaseInsensitive = true,
+                        Converters = { new JsonStringEnumConverter() }
+                    };
+                    var data = JsonSerializer.Deserialize<FileOutput>(toolResult, options);
+                    if (data != null)
                     {
-                        var data = JsonSerializer.Deserialize<JsonElement>(jsonResult);
-                        result.FilePath = data.GetProperty("filePath").GetString();
-                        result.Content = data.GetProperty("content").GetString();
-                        result.FileSize = data.GetProperty("size").GetInt64();
-                        result.LastModified = data.GetProperty("lastModified").GetDateTime();
-                        result.Success = true;
-                        return result;
+                        data.Metadata = metadata;
+                        return data;
                     }
-                    catch
-                    {
-                        // Fall through to error handling
-                    }
+                }
+                catch (Exception ex)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = $"Could not parse tool result: {ex.Message}";
+                    result.Content = toolResult;
+                    return result;
                 }
             }
 
-            // Fallback: couldn't parse
+            // Fallback: no tool result found
             result.Success = false;
-            result.ErrorMessage = "Could not parse tool result";
+            result.ErrorMessage = "No ReadFileContent tool result found";
             result.Content = textResult;
             return result;
         }
