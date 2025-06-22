@@ -65,9 +65,6 @@ namespace MoniaAgent.Core
         // IAgent implementation
         public virtual string Name => "Agent";
         public virtual string Specialty => "General purpose assistant";
-        public virtual Type[] SupportedInputTypes => new[] { typeof(AgentInput) };
-        public virtual Type ExpectedOutputType => typeof(AgentOutput);
-        public virtual bool CanHandle(string task) => true;
 
 
         protected Agent(LLM llm, IMcpClient? mcpClient = null)
@@ -314,7 +311,9 @@ namespace MoniaAgent.Core
                 // Convert string result to typed result
                 var result = ConvertToTypedResult(textResult, executionMetadata);
                 
-                result.Metadata = executionMetadata;
+                // Framework ensures metadata is always correctly set
+                if (result.Metadata == null || result.Metadata != executionMetadata)
+                    result.Metadata = executionMetadata;
                 result.Metadata.EndTime = DateTime.UtcNow;
                 
                 return result;

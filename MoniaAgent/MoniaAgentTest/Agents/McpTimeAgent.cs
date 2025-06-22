@@ -39,9 +39,9 @@ namespace MoniaAgentTest.Agents
 
 
         // Implement abstract method for string to output conversion
-        protected override TextOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
+        protected override TextOutput ConvertResultToOutput(string finalLLMAnswer, ExecutionMetadata metadata)
         {
-            return new TextOutput { Success = !textResult.Contains("Error") && !textResult.Contains("Failed"), Content = textResult, Metadata = metadata };
+            return new TextOutput { Success = !finalLLMAnswer.Contains("Error") && !finalLLMAnswer.Contains("Failed"), Content = finalLLMAnswer, Metadata = metadata };
         }
     }
 }

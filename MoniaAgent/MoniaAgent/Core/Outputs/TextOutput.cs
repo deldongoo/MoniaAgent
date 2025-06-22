@@ -5,6 +5,6 @@ namespace MoniaAgent.Core.Outputs
     /// </summary>
     public class TextOutput : AgentOutput
     {
-        public string Content { get; set; } = string.Empty;
+        // Content property is inherited from AgentOutput
     }
 }

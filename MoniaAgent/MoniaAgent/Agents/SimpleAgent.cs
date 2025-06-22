@@ -20,11 +20,11 @@ namespace MoniaAgent.Agents
             Goal = "You are a helpful assistant with no tools. Simply respond to user prompt"
         };
 
-        protected override TextOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
+        protected override TextOutput ConvertResultToOutput(string finalLLMAnswer, ExecutionMetadata metadata)
         {
             return new TextOutput
             {
-                Content = textResult,
+                Content = finalLLMAnswer,
                 Success = true,
                 Metadata = metadata
             };

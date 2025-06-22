@@ -32,17 +32,19 @@ namespace MoniaAgentTest.Agents
         private static TimeOutput GetCurrentTime()
         {
             var now = DateTime.Now;
+            var formattedTime = now.ToString("yyyy-MM-dd HH:mm:ss zzz");
             return new TimeOutput
             {
                 CurrentTime = now,
-                FormattedTime = now.ToString("yyyy-MM-dd HH:mm:ss zzz"),
+                FormattedTime = formattedTime,
+                Content = $"Current time: {formattedTime}",
                 Success = true
             };
         }
 
 
         // Implement abstract method for string to output conversion
-        protected override TimeOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
+        protected override TimeOutput ConvertResultToOutput(string finalLLMAnswer, ExecutionMetadata metadata)
         {
             var toolResult = metadata.FindToolResult("GetCurrentTime");
             if (!string.IsNullOrEmpty(toolResult))
@@ -54,8 +56,7 @@ namespace MoniaAgentTest.Agents
                 var result = JsonSerializer.Deserialize<TimeOutput>(toolResult, options);
                 if (result != null)
                 {
-                    result.Metadata = metadata;
-                    result.Content = textResult;
+                    // Preserve Content from tool - don't overwrite with LLM response
                     return result;
                 }
             }
@@ -63,9 +64,9 @@ namespace MoniaAgentTest.Agents
             return new TimeOutput
             {
                 Success = false,
-                Content = textResult,
-                ErrorMessage = "No time result found",
-                Metadata = metadata
+                Content = finalLLMAnswer,
+                ErrorMessage = "No time result found"
+                // Framework handles metadata assignment
             };
         }
     }

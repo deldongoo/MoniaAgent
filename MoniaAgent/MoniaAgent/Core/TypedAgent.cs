@@ -38,23 +38,19 @@ namespace MoniaAgent.Core
 
         public override string Name => config.Name;
         public override string Specialty => config.Specialty;
-        public override Type[] SupportedInputTypes => new[] { typeof(TInput) };
-        public override Type ExpectedOutputType => typeof(TOutput);
 
-        public override bool CanHandle(string task)
-        {
-            return config.Keywords.Any(k => task.ToLower().Contains(k.ToLower()));
-        }
-
-        // Override base ExecuteAsync to handle type validation
+        // Override base ExecuteAsync to handle type validation with fallback
         public override async Task<AgentOutput> ExecuteAsync(AgentInput input, CancellationToken cancellationToken = default)
         {
-            if (input is not TInput typedInput)
+            if (input is TInput typedInput)
             {
-                return CreateTypedError($"Invalid input type. Expected {typeof(TInput).Name}, got {input.GetType().Name}");
+                // Use typed path when input matches expected type
+                return await ExecuteAsync(typedInput, cancellationToken);
             }
             
-            return await ExecuteAsync(typedInput, cancellationToken);
+            // Fallback to base Agent.ExecuteAsync for other input types (like TextInput from SmartWorkflow)
+            // This allows ConvertInputToPrompt to handle the conversion
+            return await base.ExecuteAsync(input, cancellationToken);
         }
 
         // Typed version - primary implementation
@@ -69,11 +65,11 @@ namespace MoniaAgent.Core
         protected override AgentOutput ConvertToTypedResult(string textResult, ExecutionMetadata metadata)
         {
             // Let derived classes handle conversion
-            return ConvertStringToOutput(textResult, metadata);
+            return ConvertResultToOutput(textResult, metadata);
         }
 
         // New abstract method for typed conversion
-        protected abstract TOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata);
+        protected abstract TOutput ConvertResultToOutput(string finalLLMAnswer, ExecutionMetadata metadata);
 
         private TOutput CreateTypedError(string message)
         {

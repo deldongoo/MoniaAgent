@@ -28,7 +28,8 @@ namespace MoniaAgentTest
 
             // Run tests
             //await TestWorkflowSystem(llm);
-            await TestMcpDesktopCommander(llm);
+            //await TestMcpDesktopCommander(llm);
+            await TestSmartWorkflow(llm);
             //await TestTimeAgent(llm);
             //await TestFileReaderAgent(llm);
 
@@ -136,6 +137,35 @@ namespace MoniaAgentTest
             catch (Exception ex)
             {
                 Console.WriteLine($"Desktop commander test failed: {ex.Message}");
+            }
+            
+            Console.WriteLine();
+        }
+
+        static async Task TestSmartWorkflow(LLM llm)
+        {
+            Console.WriteLine("=== Testing Smart Workflow ===");
+
+            try
+            {
+                var smartWorkflow = new SmartWorkflow(llm);
+                
+                smartWorkflow.RegisterAgentType<TimeAgent>("Handles time-related queries and scheduling");
+                smartWorkflow.RegisterAgentType<FileReaderAgent>("Reads and processes files from the filesystem");
+                
+                var timeResult = await smartWorkflow.ExecuteWithPlanning("What time is it now?");
+                Console.WriteLine($"Time query - Success: {timeResult.Success}");
+                Console.WriteLine($"Time query - Content: {timeResult.Content}");
+                
+                Console.WriteLine();
+                
+                var fileResult = await smartWorkflow.ExecuteWithPlanning("Read the file test-file.txt");
+                Console.WriteLine($"File query - Success: {fileResult.Success}");
+                Console.WriteLine($"File query - Content: {fileResult.Content}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Smart workflow test failed: {ex.Message}");
             }
             
             Console.WriteLine();

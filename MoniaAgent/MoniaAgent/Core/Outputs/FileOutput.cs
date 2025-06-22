@@ -7,10 +7,7 @@ namespace MoniaAgent.Core.Outputs
     /// </summary>
     public class FileOutput : AgentOutput
     {
-        /// <summary>
-        /// File content (for read operations) or result message
-        /// </summary>
-        public string Content { get; set; } = string.Empty;
+        // Content property is inherited from AgentOutput
         
         /// <summary>
         /// Path of the file that was operated on

@@ -7,10 +7,7 @@ namespace MoniaAgent.Core
     {
         string Name { get; }
         string Specialty { get; }
-        Type[] SupportedInputTypes { get; }
-        Type ExpectedOutputType { get; }
         Task<AgentOutput> ExecuteAsync(AgentInput input, CancellationToken cancellationToken = default);
-        bool CanHandle(string task);
     }
 
     /// <summary>

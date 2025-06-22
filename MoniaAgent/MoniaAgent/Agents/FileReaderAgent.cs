@@ -35,6 +35,7 @@ namespace MoniaAgent.Agents
                     return new FileOutput
                     {
                         FilePath = filePath,
+                        Content = $"File not found: {filePath}",
                         Success = false,
                         ErrorMessage = "File not found",
                         Operation = FileOperation.Read
@@ -59,6 +60,7 @@ namespace MoniaAgent.Agents
                 return new FileOutput
                 {
                     FilePath = filePath,
+                    Content = $"Error reading file {filePath}: {ex.Message}",
                     Success = false,
                     ErrorMessage = ex.Message,
                     Operation = FileOperation.Read
@@ -66,18 +68,20 @@ namespace MoniaAgent.Agents
             }
         }
 
-        // Override input conversion to handle FileInput with simplified prompt
+        // Override input conversion to handle both FileInput and TextInput
         protected override string ConvertInputToPrompt(AgentInput input)
         {
             if (input is FileInput fileInput)
             {
                 return $"Read the file: {fileInput.FilePath}";
             }
+           
             return base.ConvertInputToPrompt(input);
         }
+    
 
         // Implement typed conversion
-        protected override FileOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
+        protected override FileOutput ConvertResultToOutput(string finalLLMAnswer, ExecutionMetadata metadata)
         {
             var result = new FileOutput
             {
@@ -100,7 +104,8 @@ namespace MoniaAgent.Agents
                     var data = JsonSerializer.Deserialize<FileOutput>(toolResult, options);
                     if (data != null)
                     {
-                        data.Metadata = metadata;
+                        // Framework handles metadata assignment
+                        // Preserve Content from tool - don't overwrite with LLM response
                         return data;
                     }
                 }
@@ -116,7 +121,7 @@ namespace MoniaAgent.Agents
             // Fallback: no tool result found
             result.Success = false;
             result.ErrorMessage = "No ReadFileContent tool result found";
-            result.Content = textResult;
+            result.Content = finalLLMAnswer;
             return result;
         }
     }

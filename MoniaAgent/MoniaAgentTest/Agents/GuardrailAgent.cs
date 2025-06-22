@@ -49,14 +49,14 @@ namespace MoniaAgentTest.Agents
             return base.ConvertInputToPrompt(input);
         }
 
-        protected override ContentSafetyOutput ConvertStringToOutput(string textResult, ExecutionMetadata metadata)
+        protected override ContentSafetyOutput ConvertResultToOutput(string finalLLMAnswer, ExecutionMetadata metadata)
         {
             var output = new ContentSafetyOutput
             {
                 Metadata = metadata,
                 IsSafe = false,
                 RiskLevel = "Critical",
-                Summary = textResult
+                Summary = finalLLMAnswer
             };
 
             try
@@ -65,7 +65,7 @@ namespace MoniaAgentTest.Agents
                 var firstLlmResponse = metadata.ConversationHistory?
                     .FirstOrDefault(step => step.Type == ConversationStepType.LlmResponse);
 
-                string jsonContent = firstLlmResponse?.Content ?? textResult;
+                string jsonContent = firstLlmResponse?.Content ?? finalLLMAnswer;
 
                 // With UseStructuredOutput=true, the LLM response should be pure JSON
                 var options = new JsonSerializerOptions

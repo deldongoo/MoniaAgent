@@ -18,6 +18,11 @@ namespace MoniaAgent.Core.Outputs
         public string? ErrorMessage { get; set; }
         
         /// <summary>
+        /// Content of the output - unified access across all output types
+        /// </summary>
+        public virtual string Content { get; set; } = string.Empty;
+        
+        /// <summary>
         /// Metadata about the execution
         /// </summary>
         public ExecutionMetadata Metadata { get; set; } = new();
