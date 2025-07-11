@@ -17,7 +17,9 @@ MoniaAgent/
 ├── Core/
 │   ├── Agent.cs              # Base agent implementation
 │   ├── IAgent.cs             # Agent interface
-│   └── AgentOrchestrator.cs  # Task routing system
+│   ├── AgentRegistry.cs      # Agent registration and metadata
+│   └── Orchestration/        # Dynamic agent orchestration
+│       └── OrchestratorAgent.cs  # LLM-driven agent orchestrator
 ├── Agents/
 │   └── SpecializedAgent.cs   # Abstract specialized agent base
 ├── Configuration/
@@ -25,6 +27,8 @@ MoniaAgent/
 ├── Tools/
 │   ├── ToolRegistry.cs       # Tool management system
 │   └── TaskCompleteTool.cs   # Built-in completion tool
+├── Workflows/                # Predefined sequential workflows
+│   └── Workflow.cs           # Static workflow execution
 └── Extensions/
     └── ServiceCollectionExtensions.cs  # DI setup
 
@@ -44,7 +48,8 @@ McpServerTime/
 - **Agent (Core/Agent.cs)** - Base class handling LLM communication, tool execution, and MCP client integration
 - **IAgent (Core/IAgent.cs)** - Interface defining agent capabilities (Name, Specialty, Execute, CanHandle)
 - **SpecializedAgent (Agents/SpecializedAgent.cs)** - Abstract base for creating specialized agents with specific configurations
-- **AgentOrchestrator (Core/AgentOrchestrator.cs)** - Routes tasks to the most appropriate agent based on specialties
+- **AgentRegistry (Core/AgentRegistry.cs)** - Manages agent registration and metadata extraction
+- **OrchestratorAgent (Core/Orchestration/OrchestratorAgent.cs)** - Special agent that can discover and execute other agents as tools
 
 ### Agent Configuration System
 
@@ -139,7 +144,7 @@ dotnet build --no-run
 2. **Implement Configure()**: Define agent configuration including name, specialty, keywords, and tools
 3. **Add Tool Methods**: Register local methods as tools via `AgentConfig.ToolMethods`
 4. **Configure MCP Servers**: Add MCP server connections via `AgentConfig.McpServers`
-5. **Define Keywords**: Set routing keywords in `AgentConfig.Keywords` for orchestrator
+5. **Define Keywords**: Set routing keywords in `AgentConfig.Keywords` for discovery
 
 ### Tool Development
 - **Local Tools**: Create methods and register them in `AgentConfig.ToolMethods`
@@ -147,10 +152,19 @@ dotnet build --no-run
 - **Tool Discovery**: Tools are automatically discovered and registered by `ToolRegistry`
 - **Tool Execution**: Framework handles both local and remote tool execution transparently
 
-### Task Routing
-- **Orchestrator**: `AgentOrchestrator` routes tasks based on agent specialties and keywords
-- **CanHandle**: Agents implement `CanHandle()` method for task suitability evaluation
-- **Fallback**: Framework provides fallback mechanisms for unhandled tasks
+## Multi-Agent Paradigms
+
+### 1. Dynamic Orchestration (Agents as Tools)
+- **Use OrchestratorAgent**: LLM discovers and uses agents dynamically
+- **No predefined plan**: LLM decides which agents to use at runtime
+- **Flexible execution**: Can adapt strategy based on intermediate results
+- **Best for**: Complex, unpredictable tasks requiring intelligent coordination
+
+### 2. Predefined Workflows
+- **Use Workflow/WorkflowBuilder**: Define exact sequence of agent steps
+- **Static execution**: Follows predetermined path with conditional branches
+- **Predictable behavior**: Same input produces same execution path
+- **Best for**: Repetitive tasks with known requirements
 
 ## MCP Server Integration
 
@@ -176,7 +190,9 @@ MCP servers provide external tools to agents. The framework:
 5. **Completion Detection**: Returns result when task completion is detected or max turns reached
 6. **Resource Cleanup**: Properly disposes of resources and connections
 
-### Basic Usage Pattern
+### Usage Patterns
+
+#### Direct Agent Usage (Single Agent)
 ```csharp
 // Simple usage - connection is automatic
 var agent = new FileReaderAgent(llm);
@@ -185,6 +201,30 @@ var result = await agent.ExecuteAsync("Read test-file.txt");
 // Works with specialized inputs too
 var textInput = new TextInput("What time is it?");
 var timeResult = await timeAgent.ExecuteAsync(textInput);
+```
+
+#### Orchestrator Usage (Dynamic Multi-Agent)
+```csharp
+// Create orchestrator and register agents
+var orchestrator = new OrchestratorAgent(llm);
+orchestrator.RegisterAgentType<FileReaderAgent>();
+orchestrator.RegisterAgentType<TranslatorAgent>();
+
+// LLM will discover and use appropriate agents
+var result = await orchestrator.ExecuteAsync("Read test.txt and translate to French");
+```
+
+#### Predefined Workflows (Static Multi-Agent)
+```csharp
+// Create a workflow with fixed steps
+var workflow = new WorkflowBuilder("translation-workflow")
+    .AddAgent<FileReaderAgent>()
+    .AddStep("reader", "Read source file")
+    .AddAgent<TranslatorAgent>()
+    .AddStep("translator", "Translate content")
+    .Build();
+
+var result = await workflow.ExecuteAsync("Start workflow");
 ```
 
 ## Troubleshooting

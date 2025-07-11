@@ -1,16 +1,40 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.VisualBasic;
 using ModelContextProtocol.Protocol;
-using MoniaAgent.Agents;
-using MoniaAgent.Configuration;
-using MoniaAgent.Core;
-using MoniaAgent.Core.Inputs;
-using MoniaAgent.Core.Outputs;
-using MoniaAgent.Workflows;
 using MoniaAgentTest.Agents;
+using MoniaAgentTest.Inputs;
+using MoniaAgentTest.Outputs;
+using MoniaAgent.Configuration;
+using MoniaAgent.Agent;
+using MoniaAgent.Agent.Inputs;
+using MoniaAgent.Agent.Outputs;
+using MoniaAgent.Orchestration.Dynamic;
+using MoniaAgent.Orchestration.Static;
+using System.ComponentModel;
 using System.Linq;
+using System.Net.NetworkInformation;
+using System.Security.Claims;
+using System.Xml.Linq;
 
 namespace MoniaAgentTest
 {
+
+    public class GitLabConfig
+    {
+        public string PersonalAccessToken { get; set; } = string.Empty;
+        public string ApiUrl { get; set; } = "https://gitlab.com";
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(PersonalAccessToken))
+                throw new ArgumentException("GitLab Personal Access Token cannot be null or empty", nameof(PersonalAccessToken));
+            if (string.IsNullOrWhiteSpace(ApiUrl))
+                throw new ArgumentException("GitLab API URL cannot be null or empty", nameof(ApiUrl));
+            if (!Uri.TryCreate(ApiUrl, UriKind.Absolute, out _))
+                throw new ArgumentException("GitLab API URL must be a valid URI", nameof(ApiUrl));
+        }
+    }
+
     internal class Program
     {
         static async Task Main(string[] args)
@@ -24,14 +48,15 @@ namespace MoniaAgentTest
             Console.WriteLine("=== MoniaAgent Test Application ===\n");
             
             // Setup configuration
-            var llm = SetupConfiguration();
+            var (llm, gitlabConfig) = SetupConfiguration();
 
             // Run tests
             //await TestWorkflowSystem(llm);
             //await TestMcpDesktopCommander(llm);
-            await TestSmartWorkflow(llm);
+            await TestOrchestratorAgent(llm);
             //await TestTimeAgent(llm);
             //await TestFileReaderAgent(llm);
+            //await TestTranslatorAgent(llm);
 
             Console.WriteLine("\n=== All tests completed ===");
         }
@@ -48,7 +73,7 @@ namespace MoniaAgentTest
             else if (args.Contains("--silent"))
                 logLevel = Microsoft.Extensions.Logging.LogLevel.Error;
 
-            logLevel = Microsoft.Extensions.Logging.LogLevel.Error;
+            //logLevel = Microsoft.Extensions.Logging.LogLevel.Error;
             // Configure MoniaLogging using the built-in helper
             MoniaLogging.ConfigureDefault(logLevel);
             
@@ -56,7 +81,7 @@ namespace MoniaAgentTest
             Console.WriteLine($"Logging configured with level: {logLevel}");
         }
 
-        static LLM SetupConfiguration()
+        static (LLM llm, GitLabConfig gitLabConfig) SetupConfiguration()
         {
             // Load configuration from JSON file
             var configuration = new ConfigurationBuilder()
@@ -66,8 +91,11 @@ namespace MoniaAgentTest
 
             var llm = new LLM();
             configuration.GetSection("LLM").Bind(llm);
-            
-            return llm;
+
+            var gitLabConfig = new GitLabConfig();
+            configuration.GetSection("GitLab").Bind(gitLabConfig);
+
+            return (llm, gitLabConfig);
         }
 
         static async Task TestWorkflowSystem(LLM llm)
@@ -121,18 +149,28 @@ namespace MoniaAgentTest
             try
             {
                 var desktopCommanderAgent = new McpDesktopCommanderAgent(llm);
+                /*var result = await desktopCommanderAgent.ExecuteAsync(@"Generate an SVG of a pelican riding a bicycle.
+                    Write the code into a html file in C:\Users\serva\source\repos\MoniaSandbox.
+                    Launch it in a web browser.");*/
 
+                var result = await desktopCommanderAgent.ExecuteAsync(@"Add 'C:\Users\serva\source\repos\MoniaAgent\MoniaAgent\MoniaAgent\Core' to your allowed directories. Analyse the repository's source files and extract all classes, interfaces, enums, and their relationships to generate a comprehensive UML class diagram. Extract the following elements from each source file and store it in a analysis.json file:
+- **Classes/Interfaces/Enums**: Name, type, namespace/package, access modifiers
+- **Attributes/Properties**: Name, type (including generics), visibility, static/instance
+- **Methods**: Name, parameters (with types), return type, visibility, static/instance
+- **Relationships**: Inheritance, implementation, composition, aggregation, dependencies
+Then Convert the JSON to a valid PlantUML class diagram strored in a class_diagram.puml file.");
+                /*
                 var workflow = new WorkflowBuilder()
                     .WithName("FileProcessingWorkflow")
                     .RegisterAgent(desktopCommanderAgent)
                     .AddStep("McpDesktopCommanderAgent", config =>
                     {
-                        config.InputTransformer = _ => new TextInput("Draw a butterfly in svg.Write the code into a html file in C:\\Users\\serva\\source\\repos\\MoniaSandbox.Launch it in a web browser.");
+                        config.InputTransformer = _ => new TextInput("\"Generate an SVG of a pelican riding a bicycle. Write the code into a html file in C:\\Users\\serva\\source\\repos\\MoniaSandbox.Launch it in a web browser.");
                     })
                     .Build();
 
-                var workflowResult = await workflow.ExecuteAsync("Load SVG butterfly in the browser");
-                DisplayWorkflowResult(workflowResult);
+                var workflowResult = await workflow.ExecuteAsync("Load SVG butterfly in the browser");*/
+                //DisplayWorkflowResult(workflowResult);
             }
             catch (Exception ex)
             {
@@ -142,30 +180,47 @@ namespace MoniaAgentTest
             Console.WriteLine();
         }
 
-        static async Task TestSmartWorkflow(LLM llm)
+        static async Task TestOrchestratorAgent(LLM llm)
         {
-            Console.WriteLine("=== Testing Smart Workflow ===");
+            Console.WriteLine("=== Testing Orchestrator Agent ===");
 
             try
             {
-                var smartWorkflow = new SmartWorkflow(llm);
+                var orchestrator = new OrchestratorAgent(llm);
                 
-                smartWorkflow.RegisterAgentType<TimeAgent>("Handles time-related queries and scheduling");
-                smartWorkflow.RegisterAgentType<FileReaderAgent>("Reads and processes files from the filesystem");
-                
-                var timeResult = await smartWorkflow.ExecuteWithPlanning("What time is it now?");
+                // Register available agents
+                orchestrator.RegisterAgentType<TimeAgent>();
+                orchestrator.RegisterAgentType<FileReaderAgent>();
+                orchestrator.RegisterAgentType<GuardRailAgent>();
+                orchestrator.RegisterAgentType<TranslatorAgent>();
+                orchestrator.RegisterAgentType<McpDesktopCommanderAgent>();
+
+                // Test single agent task
+                /*Console.WriteLine("\n--- Test 1: Single Agent Task ---");
+                var timeResult = await orchestrator.ExecuteAsync("What time is it now?");
                 Console.WriteLine($"Time query - Success: {timeResult.Success}");
                 Console.WriteLine($"Time query - Content: {timeResult.Content}");
                 
-                Console.WriteLine();
-                
-                var fileResult = await smartWorkflow.ExecuteWithPlanning("Read the file test-file.txt");
+                Console.WriteLine("\n--- Test 2: File Reading Task ---");
+                var fileResult = await orchestrator.ExecuteAsync("Read the file test-file.txt");
                 Console.WriteLine($"File query - Success: {fileResult.Success}");
                 Console.WriteLine($"File query - Content: {fileResult.Content}");
+
+                // Test complex multi-agent task
+                Console.WriteLine("\n--- Test 3: Multi-Agent Task ---");
+                var complexResult = await orchestrator.ExecuteAsync("Read test-file.txt and tell me what time it is");
+                Console.WriteLine($"Complex query - Success: {complexResult.Success}");
+                Console.WriteLine($"Complex query - Content: {complexResult.Content}");*/
+                
+                // Test with a task that requires sequential steps
+                Console.WriteLine("\n--- Test 4: Sequential Multi-Agent Task ---");
+                var safetyCheckResult = await orchestrator.ExecuteAsync("Read safe-test-file.txt, check if the content is safe, if it is translate it to english and write translation in test-file-translated.txt");
+                Console.WriteLine($"Safety check - Success: {safetyCheckResult.Success}");
+                Console.WriteLine($"Safety check - Content: {safetyCheckResult.Content}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Smart workflow test failed: {ex.Message}");
+                Console.WriteLine($"Orchestrator test failed: {ex.Message}");
             }
             
             Console.WriteLine();
@@ -224,6 +279,37 @@ namespace MoniaAgentTest
             catch (Exception ex)
             {
                 Console.WriteLine($"File reader test failed: {ex.Message}");
+            }
+            
+            Console.WriteLine();
+        }
+
+        static async Task TestTranslatorAgent(LLM llm)
+        {
+            Console.WriteLine("=== Testing TranslatorAgent ===");
+            
+            try
+            {
+                var translatorAgent = new TranslatorAgent(llm);
+                var result = await translatorAgent.ExecuteAsync(new TranslationInput
+                {
+                    Content = "Hello, how are you?",
+                    TargetLanguage = "French"
+                });
+                if (result.Success)
+                {
+                    Console.WriteLine($"Translation success: {result.Success}");
+                    Console.WriteLine($"Text: {result.Content}");
+                }
+                else
+                {
+                    Console.WriteLine($"Error: {result.ErrorMessage}");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Translator test failed: {ex.Message}");
             }
             
             Console.WriteLine();

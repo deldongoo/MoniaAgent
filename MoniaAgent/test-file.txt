@@ -1,4 +1,1 @@
-This is a test file for the MoniaAgent SmartWorkflow system.
-It contains sample content to test the FileReaderAgent functionality.
-The enhanced system should now correctly parse file paths from tasks
-and create appropriate FileInput objects instead of TextInput.
+ceci est un fichier simple à traduire

@@ -1,6 +1,6 @@
-using MoniaAgent.Core;
-using MoniaAgent.Core.Inputs;
-using MoniaAgent.Core.Outputs;
+using MoniaAgent.Agent;
+using MoniaAgent.Agent.Inputs;
+using MoniaAgent.Agent.Outputs;
 using MoniaAgent.Configuration;
 using System.ComponentModel;
 using System.Text.Json;
@@ -13,19 +13,21 @@ namespace MoniaAgentTest.Agents
         public string FormattedTime { get; set; } = string.Empty;
     }
 
+    [AgentMetadata(
+        Name = "TimeAgent",
+        Specialty = "Time and scheduling queries",
+        Keywords = new[] { "time", "date", "when", "schedule", "timezone", "clock", "now", "today", "tomorrow", "yesterday" },
+        Goal = "You are a time specialist AI assistant. You help users with time-related queries, timezone conversions, and scheduling. Always use the get_current_time tool when users ask about current time."
+    )]
     public class TimeAgent : TypedAgent<TextInput, TimeOutput>
     {
         public TimeAgent(LLM llm) : base(llm)
         {
         }
 
-        protected override AgentConfig Configure() => new()
+        protected override AgentConfig ConfigureTools() => new()
         {
-            Name = "TimeAgent",
-            Specialty = "Time and scheduling queries",
-            Keywords = new[] { "time", "date", "when", "schedule", "timezone" },
-            ToolMethods = new Delegate[] { GetCurrentTime },
-            Goal = "You are a time specialist AI assistant. You help users with time-related queries, timezone conversions, and scheduling. Always use the get_current_time tool when users ask about current time."
+            ToolMethods = new Delegate[] { GetCurrentTime }
         };
 
         [Description("Return the current time in the system timezone")]

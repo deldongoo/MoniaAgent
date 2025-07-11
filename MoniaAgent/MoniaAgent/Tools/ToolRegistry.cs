@@ -5,7 +5,7 @@ using ModelContextProtocol.Protocol;
 using System.Collections.Generic;
 using System.Text.Json;
 using MoniaAgent.Configuration;
-using MoniaAgent.Core;
+using MoniaAgent.Agent;
 
 namespace MoniaAgent.Tools
 {
