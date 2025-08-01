@@ -1,13 +1,15 @@
 ﻿using GitLabApiClient;
+using GitLabApiClient.Models.Branches.Requests;
 using GitLabApiClient.Models.Commits.Requests;
 using GitLabApiClient.Models.Commits.Requests.CreateCommitRequest;
 using GitLabApiClient.Models.Issues.Requests;
 using GitLabApiClient.Models.MergeRequests.Requests;
+using GitLabApiClient.Models.Notes.Requests;
 using GitLabApiClient.Models.Projects.Requests;
-using MoniaAgent.Configuration;
 using MoniaAgent.Agent;
 using MoniaAgent.Agent.Inputs;
 using MoniaAgent.Agent.Outputs;
+using MoniaAgent.Configuration;
 using System.ComponentModel;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -31,15 +33,37 @@ namespace MoniaAgentTest.Agents
             "issue", "merge", "request", "branch", "search", "project", "repo", "version", "control"
         },
         Goal = @"You are a GitLab specialist agent with access to GitLab API operations.
-            You can:
-            - Create and update files in repositories
-            - Push multiple files in a single commit
-            - Search for repositories
-            - Get file and directory contents
-            - Create issues
-            - Create merge requests
+                    You can:
+                    - Create and update files in repositories
+                    - Push multiple files in a single commit
+                    - Search for repositories
+                    - Get file and directory contents
+                    - Create issues
+                    - Create merge requests
+                    - Read and handle issues
+                    - Search code in repositories 
+                    - Create working branches
+                    - Update issues
+                    - Create issue notes
 
-            Use the available GitLab tools to complete user requests efficiently."
+                    When asked to ""treat"" or ""handle"" an issue:
+                    1. First use get_issue to understand the issue details
+                    2. Analyze the issue description to identify what needs to be changed
+                    3. Use search_code_in_repository to find relevant files containing the code to modify. 
+                    4. Use get_file_contents to examine the exact content of identified files. If you're not satisfied with what you found, use search_code_in_repository again with a new search query. 
+                    5. Create a new branch for the fix using create_branch (format: fix/issue-{number}-{short-description})
+                    6. Make the necessary changes using create_or_update_file
+                    7. Create a merge request linking to the issue using create_merge_request
+                    8. Add a comment on the issue using create_issue_note to indicate the MR has been created
+                    9. Optionally update the issue status using update_issue
+
+                    For code changes described in issues:
+                    - Search intelligently using keywords from the issue description
+                    - If searching for numeric values (like ""500""), also search for context words nearby
+                    - Examine multiple files if the first search doesn't yield results
+                    - Look for common file patterns (config files, animation files, component files)
+                    
+                    Use the available GitLab tools to complete user requests efficiently."
     )]
     public class GitLabAgent : TypedAgent<TextInput, GitLabOutput>
     {
@@ -66,26 +90,30 @@ namespace MoniaAgentTest.Agents
             }
         }
 
-        protected override AgentConfig ConfigureTools() => new()
-        {
-            ToolMethods = new Delegate[] {
+    protected override AgentConfig ConfigureTools() => new()
+    {
+        ToolMethods = new Delegate[] {
                 CreateOrUpdateFile,
                 PushFiles,
                 SearchRepositories,
                 GetFileContents,
                 CreateIssue,
-                CreateMergeRequest
+                CreateMergeRequest,
+                GetIssue,
+                SearchCodeInRepository,
+                CreateBranch,
+                UpdateIssue,
+                CreateIssueNote
             }
-        };
+    };
 
-        [Description("Create or update a single file in a GitLab project. Parameters: projectId (string), filePath (string), content (string), commitMessage (string), branch (string), previousPath (optional string)")]
         private async Task<GitLabOutput> CreateOrUpdateFile(
-            string projectId,
-            string filePath,
-            string content,
-            string commitMessage,
-            string branch,
-            string? previousPath = null)
+    string projectId,
+    string filePath,
+    string content,
+    string commitMessage,
+    string branch,
+    string? previousPath = null)
         {
             try
             {
@@ -105,22 +133,26 @@ namespace MoniaAgentTest.Agents
                 }
                 else
                 {
-                    // Create/Update operation
-                    actions.Add(new CreateCommitRequestAction(CreateCommitRequestActionType.Create, filePath)
+                    // Pour une branche nouvellement créée, le fichier existe toujours (copié depuis la branche source)
+                    // On doit donc toujours utiliser Update sauf si on sait que c'est un nouveau fichier
+                    // La façon la plus simple est d'essayer Update d'abord, et si ça échoue, essayer Create
+
+                    // Ou plus simplement : toujours utiliser Update pour les fichiers existants
+                    // GitLab accepte Update même sur une nouvelle branche
+                    actions.Add(new CreateCommitRequestAction(CreateCommitRequestActionType.Update, filePath)
                     {
                         Content = content
                     });
                 }
 
                 var createRequest = new CreateCommitRequest(branch, commitMessage, actions);
-
                 var commit = await gitLabClient.Commits.CreateAsync(projectId, createRequest);
 
                 return new GitLabOutput
                 {
                     Success = true,
                     Operation = "CreateOrUpdateFile",
-                    Content = $"File {filePath} successfully {(previousPath != null ? "moved and updated" : "created/updated")} in project {projectId}",
+                    Content = $"File {filePath} successfully {(previousPath != null ? "moved and updated" : "updated")} in project {projectId}",
                     Data = new
                     {
                         CommitId = commit.Id,
@@ -137,6 +169,53 @@ namespace MoniaAgentTest.Agents
             }
             catch (Exception ex)
             {
+                // Si Update échoue (fichier n'existe pas), essayer Create
+                if (ex.Message.Contains("does not exist") || ex.Message.Contains("404"))
+                {
+                    try
+                    {
+                        var actions = new List<CreateCommitRequestAction>
+                {
+                    new CreateCommitRequestAction(CreateCommitRequestActionType.Create, filePath)
+                    {
+                        Content = content
+                    }
+                };
+
+                        var createRequest = new CreateCommitRequest(branch, commitMessage, actions);
+                        var commit = await gitLabClient.Commits.CreateAsync(projectId, createRequest);
+
+                        return new GitLabOutput
+                        {
+                            Success = true,
+                            Operation = "CreateOrUpdateFile",
+                            Content = $"File {filePath} successfully created in project {projectId}",
+                            Data = new
+                            {
+                                CommitId = commit.Id,
+                                CommitMessage = commit.Message,
+                                AuthorName = commit.AuthorName,
+                                CreatedAt = commit.CreatedAt,
+                                FilePath = filePath,
+                                Branch = branch
+                            },
+                            ProjectId = projectId,
+                            Branch = branch,
+                            CommitSha = commit.Id
+                        };
+                    }
+                    catch (Exception innerEx)
+                    {
+                        return new GitLabOutput
+                        {
+                            Success = false,
+                            Operation = "CreateOrUpdateFile",
+                            ErrorMessage = innerEx.Message,
+                            Content = $"Failed to create/update file {filePath}: {innerEx.Message}"
+                        };
+                    }
+                }
+
                 return new GitLabOutput
                 {
                     Success = false,
@@ -202,6 +281,63 @@ namespace MoniaAgentTest.Agents
                     Operation = "PushFiles",
                     ErrorMessage = ex.Message,
                     Content = $"Failed to push files: {ex.Message}"
+                };
+            }
+        }
+
+        [Description("Create a new branch in a GitLab project. Parameters: projectId (string), branchName (string), ref (string - source branch/tag/commit to branch from)")]
+        private async Task<GitLabOutput> CreateBranch(
+            string projectId,
+            string branchName,
+            string @ref)
+        {
+            try
+            {
+                if (gitLabClient == null)
+                    throw new InvalidOperationException("GitLab client not initialized");
+
+                // Create the branch using the repository branches API
+                var branch = await gitLabClient.Branches.CreateAsync(projectId, new CreateBranchRequest(branchName, @ref));
+
+                return new GitLabOutput
+                {
+                    Success = true,
+                    Operation = "CreateBranch",
+                    Content = $"Successfully created branch '{branchName}' from '{@ref}' in project {projectId}",
+                    Data = new
+                    {
+                        BranchName = branch.Name,
+                        Commit = new
+                        {
+                            Id = branch.Commit.Id,
+                            ShortId = branch.Commit.ShortId,
+                            Title = branch.Commit.Title,
+                            Message = branch.Commit.Message,
+                            AuthorName = branch.Commit.AuthorName,
+                            AuthorEmail = branch.Commit.AuthorEmail,
+                            AuthoredDate = branch.Commit.AuthoredDate,
+                            CommitterName = branch.Commit.CommitterName,
+                            CommitterEmail = branch.Commit.CommitterEmail,
+                            CommittedDate = branch.Commit.CommittedDate
+                        },
+                        Protected = branch.Protected,
+                        Merged = branch.Merged,
+                        Default = branch.Default,
+                        DevelopersCanPush = branch.DevelopersCanPush,
+                        DevelopersCanMerge = branch.DevelopersCanMerge,
+                    },
+                    ProjectId = projectId,
+                    Branch = branchName
+                };
+            }
+            catch (Exception ex)
+            {
+                return new GitLabOutput
+                {
+                    Success = false,
+                    Operation = "CreateBranch",
+                    ErrorMessage = ex.Message,
+                    Content = $"Failed to create branch '{branchName}': {ex.Message}"
                 };
             }
         }
@@ -299,6 +435,103 @@ namespace MoniaAgentTest.Agents
                     Content = $"Failed to get file contents for {filePath}: {ex.Message}"
                 };
             }
+        }
+
+        [Description("Search for code in a GitLab project repository. Parameters: projectId (string), searchQuery (string), branch (optional string - default 'master'), perPage (optional int - default 20)")]
+        private async Task<GitLabOutput> SearchCodeInRepository(
+                string projectId,
+                string searchQuery,
+                string? branch = null,
+                int perPage = 20)
+        {
+            try
+            {
+                if (gitLabClient == null)
+                    throw new InvalidOperationException("GitLab client not initialized");
+
+                // GitLab API doesn't have a direct code search endpoint in the client library
+                // We'll use the raw HTTP client to access the search API
+                var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Add("PRIVATE-TOKEN", accessToken);
+
+                var encodedQuery = Uri.EscapeDataString(searchQuery);
+                var encodedProjectId = Uri.EscapeDataString(projectId);
+                var branchParam = !string.IsNullOrEmpty(branch) ? $"&ref={Uri.EscapeDataString(branch)}" : "";
+
+                var searchUrl = $"{apiUrl}/api/v4/projects/{encodedProjectId}/search?scope=blobs&search={encodedQuery}{branchParam}&per_page={perPage}";
+
+                var response = await httpClient.GetAsync(searchUrl);
+                response.EnsureSuccessStatusCode();
+
+                var content = await response.Content.ReadAsStringAsync();
+                var searchResults = JsonSerializer.Deserialize<List<CodeSearchResult>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (searchResults == null || !searchResults.Any())
+                {
+                    return new GitLabOutput
+                    {
+                        Success = true,
+                        Operation = "SearchCodeInRepository",
+                        Content = $"No results found for '{searchQuery}' in project {projectId}",
+                        Data = new
+                        {
+                            SearchQuery = searchQuery,
+                            Branch = branch ?? "all branches",
+                            ResultsCount = 0,
+                            Results = Array.Empty<object>()
+                        },
+                        ProjectId = projectId
+                    };
+                }
+
+                var formattedResults = searchResults.Select(r => new
+                {
+                    FileName = r.Filename,
+                    Path = r.Path,
+                    Ref = r.Ref,
+                    StartLine = r.Startline,
+                    MatchedContent = r.Data,
+                    ProjectId = r.ProjectId
+                }).ToArray();
+
+                return new GitLabOutput
+                {
+                    Success = true,
+                    Operation = "SearchCodeInRepository",
+                    Content = $"Found {formattedResults.Length} results for '{searchQuery}' in project {projectId}",
+                    Data = new
+                    {
+                        SearchQuery = searchQuery,
+                        Branch = branch ?? "all branches",
+                        ResultsCount = formattedResults.Length,
+                        Results = formattedResults
+                    },
+                    ProjectId = projectId
+                };
+            }
+            catch (Exception ex)
+            {
+                return new GitLabOutput
+                {
+                    Success = false,
+                    Operation = "SearchCodeInRepository",
+                    ErrorMessage = ex.Message,
+                    Content = $"Failed to search code in repository: {ex.Message}"
+                };
+            }
+        }
+
+        // Helper class for code search results
+        private class CodeSearchResult
+        {
+            public string? Basename { get; set; }
+            public string? Data { get; set; }
+            public string? Filename { get; set; }
+            public int? Id { get; set; }
+            public string? Ref { get; set; }
+            public int? Startline { get; set; }
+            public int? ProjectId { get; set; }
+            public string? Path { get; set; }
         }
 
         [Description("Create a new issue in a GitLab project. Parameters: projectId (string), title (string), description (optional string), assigneeId (optional number - single user ID), labels (optional string - comma-separated labels), milestoneId (optional number)")]
@@ -442,13 +675,186 @@ namespace MoniaAgentTest.Agents
             }
         }
 
+        [Description("Get details of a specific issue in a GitLab project. Parameters: projectId (string), issueIid (int - the internal issue ID)")]
+        private async Task<GitLabOutput> GetIssue(string projectId, int issueIid)
+        {
+            try
+            {
+                if (gitLabClient == null)
+                    throw new InvalidOperationException("GitLab client not initialized");
+
+                var issue = await gitLabClient.Issues.GetAsync(projectId, issueIid);
+
+                return new GitLabOutput
+                {
+                    Success = true,
+                    Operation = "GetIssue",
+                    Content = $"Retrieved issue #{issue.Iid}: {issue.Title} from project {projectId}",
+                    Data = new
+                    {
+                        IssueId = issue.Id,
+                        IssueIid = issue.Iid,
+                        Title = issue.Title,
+                        Description = issue.Description,
+                        State = issue.State.ToString(),
+                        CreatedAt = issue.CreatedAt,
+                        UpdatedAt = issue.UpdatedAt,
+                        ClosedAt = issue.ClosedAt,
+                        Author = new
+                        {
+                            Name = issue.Author?.Name,
+                            Username = issue.Author?.Username,
+                            Id = issue.Author?.Id
+                        },
+                        Assignees = issue.Assignees?.Select(a => new
+                        {
+                            Name = a.Name,
+                            Username = a.Username,
+                            Id = a.Id
+                        }).ToArray(),
+                        Labels = issue.Labels,
+                        Milestone = issue.Milestone != null ? new
+                        {
+                            Id = issue.Milestone.Id,
+                            Title = issue.Milestone.Title,
+                            Description = issue.Milestone.Description,
+                            State = issue.Milestone.State.ToString()
+                        } : null,
+                        WebUrl = issue.WebUrl,
+                        UserNotesCount = issue.UserNotesCount,
+                        DueDate = issue.DueDate,
+                        Confidential = issue.Confidential,
+                        Weight = issue.Weight,
+                    },
+                    ProjectId = projectId
+                };
+            }
+            catch (Exception ex)
+            {
+                return new GitLabOutput
+                {
+                    Success = false,
+                    Operation = "GetIssue",
+                    ErrorMessage = ex.Message,
+                    Content = $"Failed to get issue #{issueIid}: {ex.Message}"
+                };
+            }
+        }
+
+        [Description("Update an issue in a GitLab project. Parameters: projectId (string), issueIid (int), title (optional string), description (optional string), stateEvent (optional string - 'close' or 'reopen'), labels (optional string), assigneeIds (optional string - comma-separated IDs)")]
+        private async Task<GitLabOutput> UpdateIssue(
+    string projectId,
+    int issueIid,
+    string? title = null,
+    string? description = null,
+    string? stateEvent = null,
+    string? labels = null,
+    string? assigneeIds = null)
+        {
+            try
+            {
+                if (gitLabClient == null)
+                    throw new InvalidOperationException("GitLab client not initialized");
+
+                var updateRequest = new UpdateIssueRequest();
+
+                if (!string.IsNullOrEmpty(title))
+                    updateRequest.Title = title;
+
+                if (!string.IsNullOrEmpty(description))
+                    updateRequest.Description = description;
+
+                if (!string.IsNullOrEmpty(labels))
+                    updateRequest.Labels = labels.Split(',').Select(l => l.Trim()).ToArray();
+
+                if (!string.IsNullOrEmpty(assigneeIds))
+                {
+                    var ids = assigneeIds.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    updateRequest.Assignees = ids;
+                }
+
+                var issue = await gitLabClient.Issues.UpdateAsync(projectId, issueIid, updateRequest);
+
+                return new GitLabOutput
+                {
+                    Success = true,
+                    Operation = "UpdateIssue",
+                    Content = $"Successfully updated issue #{issue.Iid}",
+                    Data = new
+                    {
+                        IssueId = issue.Id,
+                        IssueIid = issue.Iid,
+                        Title = issue.Title,
+                        Description = issue.Description,
+                        State = issue.State.ToString(),
+                        UpdatedAt = issue.UpdatedAt,
+                        Labels = issue.Labels,
+                        Assignees = issue.Assignees?.Select(a => a.Name).ToArray()
+                    },
+                    ProjectId = projectId
+                };
+            }
+            catch (Exception ex)
+            {
+                return new GitLabOutput
+                {
+                    Success = false,
+                    Operation = "UpdateIssue",
+                    ErrorMessage = ex.Message,
+                    Content = $"Failed to update issue: {ex.Message}"
+                };
+            }
+        }
+
+        [Description("Add a new note (comment) to an issue. Parameters: projectId (string), issueIid (int), body (string - the comment text)")]
+        private async Task<GitLabOutput> CreateIssueNote(string projectId, int issueIid, string body)
+        {
+            try
+            {
+                if (gitLabClient == null)
+                    throw new InvalidOperationException("GitLab client not initialized");
+
+                var note = await gitLabClient.Issues.CreateNoteAsync(projectId, issueIid, new CreateIssueNoteRequest(body));
+
+                return new GitLabOutput
+                {
+                    Success = true,
+                    Operation = "CreateIssueNote",
+                    Content = $"Successfully added comment to issue #{issueIid}",
+                    Data = new
+                    {
+                        NoteId = note.Id,
+                        Body = note.Body,
+                        Author = note.Author?.Name,
+                        CreatedAt = note.CreatedAt,
+                        UpdatedAt = note.UpdatedAt,
+                        System = note.System,
+                        NoteableId = note.NoteableId,
+                        NoteableType = note.NoteableType
+                    },
+                    ProjectId = projectId
+                };
+            }
+            catch (Exception ex)
+            {
+                return new GitLabOutput
+                {
+                    Success = false,
+                    Operation = "CreateIssueNote",
+                    ErrorMessage = ex.Message,
+                    Content = $"Failed to add comment to issue: {ex.Message}"
+                };
+            }
+        }
+
         protected override GitLabOutput ConvertResultToOutput(string finalLLMAnswer, ExecutionMetadata metadata)
         {
-            // Check for tool results in metadata
             var toolMethods = new[] {
                 "CreateOrUpdateFile", "PushFiles", "SearchRepositories",
-                "GetFileContents", "CreateIssue", "CreateMergeRequest"
-            };
+                "GetFileContents", "CreateIssue", "CreateMergeRequest",
+                "GetIssue", "SearchCodeInRepository", "CreateBranch",
+                "CreateIssueNote", "UpdateIssue", "GetDefaultBranch"
+                };
 
             foreach (var method in toolMethods)
             {
