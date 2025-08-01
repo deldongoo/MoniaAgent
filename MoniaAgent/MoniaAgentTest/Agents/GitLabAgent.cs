@@ -122,7 +122,7 @@ namespace MoniaAgentTest.Agents
 
                 var actions = new List<CreateCommitRequestAction>();
 
-                if (previousPath != null)
+                if (!String.IsNullOrEmpty(previousPath) && previousPath != null)
                 {
                     // Move operation
                     actions.Add(new CreateCommitRequestAction(CreateCommitRequestActionType.Move, filePath)
